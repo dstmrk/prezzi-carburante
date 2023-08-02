@@ -42,7 +42,7 @@ function isRecent(date) {
   return date >= oneWeekAgo;
 }
 
-// Function to fetch and combine the CSV data into a dictionary
+//Function to fetch and combine the CSV data into a dictionary
 function fetchAndCombineCSVData(jsonDataFile) {
   const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
   const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
@@ -77,7 +77,6 @@ function fetchAndCombineCSVData(jsonDataFile) {
           const key = columns[0];
           if (!isNaN(key)) {
             const value = columns.slice(1);
-            //dataDictionary[key] = { anagrafica: value, prezzi: [] };
             dataDictionary[key] = { gestore: value[1], indirizzo: value[4] + " " + value[5] + " " + value[6],latitudine: value[7] , longitudine: value[8], prezzi: {} };
           }
         }
@@ -114,7 +113,7 @@ function fetchAndCombineCSVData(jsonDataFile) {
   });
 }
 
-// Function to read the JSON data from the file
+//Function to read the JSON data from the file
 function readJSONData(jsonDataFile, callback) {
   fs.readFile(jsonDataFile, 'utf8', (err, jsonData) => {
     if (err) {
@@ -130,6 +129,7 @@ function readJSONData(jsonDataFile, callback) {
   });
 }
 
+//Function to calculate the top stations per price
 function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel, maxItems) {
   topFuel = {};
   for (const key in jsonData) {
@@ -151,6 +151,7 @@ function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel
   return topFuel;
 }
 
+//Function to check if the json file has been updated in the latest 24 hours
 function hasFileBeenUpdatedWithin24Hours(filePath) {
   try {
     const stats = fs.statSync(filePath);

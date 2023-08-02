@@ -152,6 +152,7 @@ function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel
 }
 
 // Schedule to fetch and store the JSON data once per day at 11 am (24 hours)
+const PORT = process.env.PORT || 8888;
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const updateTime = new Date();
 updateTime.setHours(11, 0, 0, 0);
@@ -189,8 +190,8 @@ http.createServer((req, res) => {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found.' }));
   }
-}).listen(3000, () => {
-  console.log('Server is running on http://localhost:3000');
+}).listen(PORT, () => {
+  console.log('Server is running on http://localhost:'+PORT);
 });
 
 

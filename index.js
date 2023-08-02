@@ -1,7 +1,6 @@
 const express = require('express');
 const https = require('https');
 const fs = require('fs');
-const { json } = require('stream/consumers');
 
 const app = express();
 const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';

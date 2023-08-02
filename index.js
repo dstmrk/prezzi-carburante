@@ -1,8 +1,9 @@
-const http = require('http');
+const express = require('express');
 const https = require('https');
 const fs = require('fs');
 const { json } = require('stream/consumers');
 
+const app = express();
 const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
 const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
 const jsonDataFile = "data.json";
@@ -162,7 +163,7 @@ setTimeout(() => {
   setInterval(fetchAndCombineCSVData, millisecondsPerDay);
 }, timeToNextFetch);
 
-http.createServer((req, res) => {
+app.get('/api/distributori', async (req, res) => {
   const MAX_RESULTS = 5;
   if (req.method === 'GET' && req.url.startsWith('/api/distributori')) {
     const urlParams = new URLSearchParams(req.url.split('?')[1]);
@@ -190,8 +191,10 @@ http.createServer((req, res) => {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found.' }));
   }
-}).listen(PORT, () => {
-  console.log('Server is running on http://localhost:'+PORT);
+});
+
+app.listen(PORT, () => {
+  console.log(`Server started on port ${PORT}`);
 });
 
 

@@ -1,3 +1,6 @@
+#data file used for processing
+data.json
+
 # Logs
 logs
 *.log

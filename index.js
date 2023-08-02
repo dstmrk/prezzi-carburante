@@ -187,7 +187,7 @@ app.get('/api/distributori', async (req, res) => {
     const latitude = parseFloat(urlParams.get('latitude'));
     const longitude = parseFloat(urlParams.get('longitude'));
     const distanceLimit = parseInt(urlParams.get('distance'));
-    const fuel = urlParams.get('fuel').toLowerCase();
+    fuel = urlParams.get('fuel')
     maxItems = parseInt(urlParams.get('results'));
     if (!maxItems) {
       maxItems = MAX_RESULTS;
@@ -197,6 +197,7 @@ app.get('/api/distributori', async (req, res) => {
       res.end(JSON.stringify({ error: 'Invalid latitude, longitude, distance or fuel values.' }));
       return;
     }
+    fuel = fuel.toLowerCase();
     if (!hasFileBeenUpdatedWithin24Hours(jsonDataFile)) {
       console.log("Updating json file");
       fetchAndCombineCSVData(jsonDataFile);

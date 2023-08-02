@@ -16,7 +16,8 @@ results (optional):  il numero di risultati da restituire. Se non è indicato, i
 ```
 
 output:
-un json contenente il numero di risultati trovati, con chiave per ogni elemento relativa all'ordine rispetto al prezzo più basso
+un json contenente il numero di risultati trovati, con chiave per ogni elemento relativa all'ordine rispetto al prezzo più basso, e le informazioni su gestore, indirizzo, prezzo in €/l, indicazione self (0/1), data di aggiornamento dell'informazione, distanza in km dal punto di ricerca, latitudine e longitudine del distributore.
+
 
 esempio di query:
 https://prezzi-carburante.onrender.com/api/distributori?latitude=45.14027999213074&longitude=7.007186940593831&distance=5&fuel=benzina&results=3
@@ -30,7 +31,7 @@ esempio di risposta:
         "prezzo": "1.939",
         "self": "1",
         "data": "01/08/2023 07:06:13",
-        "distanza": "5.01 km",
+        "distanza": "5.01",
         "latitudine": "45.137168355127265",
         "longitudine": "7.070930600166321"
     },
@@ -40,7 +41,7 @@ esempio di risposta:
         "prezzo": "1.939",
         "self": "1",
         "data": "31/07/2023 17:01:44",
-        "distanza": "6.64 km",
+        "distanza": "6.64",
         "latitudine": "45.13802648847826",
         "longitudine": "7.091783906745945"
     },
@@ -50,7 +51,7 @@ esempio di risposta:
         "prezzo": "1.948",
         "self": "1",
         "data": "29/07/2023 08:13:55",
-        "distanza": "1.50 km",
+        "distanza": "1.50",
         "latitudine": "45.1271956771795",
         "longitudine": "7.011626588954929"
     }

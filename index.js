@@ -138,7 +138,7 @@ function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel
     const distance = calculateDistance(latitude, longitude, rowLatitude, rowLongitude);
     if (distance <= distanceLimit) {
       if (jsonData[key]["prezzi"][fuel] && isRecent(stringToDate(jsonData[key]["prezzi"][fuel]["data"]))) {
-        element = { gestore: jsonData[key]["gestore"], indirizzo: jsonData[key]["indirizzo"], prezzo: jsonData[key]["prezzi"][fuel]["prezzo"], self: jsonData[key]["prezzi"][fuel]["self"], data: jsonData[key]["prezzi"][fuel]["data"], distanza: distance.toFixed(2) + " km", latitudine: jsonData[key]["latitudine"], longitudine: jsonData[key]["longitudine"] };
+        element = { gestore: jsonData[key]["gestore"], indirizzo: jsonData[key]["indirizzo"], prezzo: jsonData[key]["prezzi"][fuel]["prezzo"], self: jsonData[key]["prezzi"][fuel]["self"], data: jsonData[key]["prezzi"][fuel]["data"], distanza: distance.toFixed(2), latitudine: jsonData[key]["latitudine"], longitudine: jsonData[key]["longitudine"] };
         for (i = 1; i <= maxItems; i++) {
           if (!topFuel[i] || element["prezzo"] < topFuel[i]["prezzo"]) {
             topFuel[i] = element;

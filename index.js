@@ -50,11 +50,11 @@ function fetchAndCombineCSVData(jsonDataFile) {
     https.get(url, (csvRes) => {
       let csvData = '';
       console.log(`Loading file from ${url}`);
-  
+
       csvRes.on('data', (chunk) => {
         csvData += chunk;
       });
-  
+
       csvRes.on('end', () => {
         callback(csvData);
       });
@@ -77,7 +77,7 @@ function fetchAndCombineCSVData(jsonDataFile) {
           const key = columns[0];
           if (!isNaN(key)) {
             const value = columns.slice(1);
-            dataDictionary[key] = { gestore: value[1], indirizzo: value[4] + " " + value[5] + " " + value[6],latitudine: value[7] , longitudine: value[8], prezzi: {} };
+            dataDictionary[key] = { gestore: value[1], indirizzo: value[4] + " " + value[5] + " " + value[6], latitudine: value[7], longitudine: value[8], prezzi: {} };
           }
         }
       }
@@ -91,13 +91,13 @@ function fetchAndCombineCSVData(jsonDataFile) {
           if (dataDictionary[key]) {
             carburante = value[0].toLowerCase();
             price = value[1];
-            if (!dataDictionary[key]["prezzi"][carburante] || dataDictionary[key]["prezzi"][carburante]["prezzo"]>price) {
-              dataDictionary[key]["prezzi"][carburante] = {prezzo: price, self: value[2], data: value[3]}
+            if (!dataDictionary[key]["prezzi"][carburante] || dataDictionary[key]["prezzi"][carburante]["prezzo"] > price) {
+              dataDictionary[key]["prezzi"][carburante] = { prezzo: price, self: value[2], data: value[3] }
             }
           }
         }
       }
-      
+
 
       // Now you have the combined data in the dataDictionary variable
       // Convert the dictionary data to JSON and store it in a file
@@ -137,8 +137,8 @@ function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel
     const rowLongitude = jsonData[key]["longitudine"];
     const distance = calculateDistance(latitude, longitude, rowLatitude, rowLongitude);
     if (distance <= distanceLimit) {
-      if(jsonData[key]["prezzi"][fuel] && isRecent(stringToDate(jsonData[key]["prezzi"][fuel]["data"]))) {
-        element = {gestore: jsonData[key]["gestore"], indirizzo: jsonData[key]["indirizzo"], prezzo: jsonData[key]["prezzi"][fuel]["prezzo"], self: jsonData[key]["prezzi"][fuel]["self"], data: jsonData[key]["prezzi"][fuel]["data"], distanza: distance.toFixed(2) + " km", latitudine:jsonData[key]["latitudine"] , longitudine: jsonData[key]["longitudine"]};
+      if (jsonData[key]["prezzi"][fuel] && isRecent(stringToDate(jsonData[key]["prezzi"][fuel]["data"]))) {
+        element = { gestore: jsonData[key]["gestore"], indirizzo: jsonData[key]["indirizzo"], prezzo: jsonData[key]["prezzi"][fuel]["prezzo"], self: jsonData[key]["prezzi"][fuel]["self"], data: jsonData[key]["prezzi"][fuel]["data"], distanza: distance.toFixed(2) + " km", latitudine: jsonData[key]["latitudine"], longitudine: jsonData[key]["longitudine"] };
         for (i = 1; i <= maxItems; i++) {
           if (!topFuel[i] || element["prezzo"] < topFuel[i]["prezzo"]) {
             topFuel[i] = element;
@@ -167,7 +167,19 @@ function hasFileBeenUpdatedWithin24Hours(filePath) {
   }
 }
 
-fetchAndCombineCSVData(jsonDataFile);
+// Function to check if a file exists at the given path
+function doesFileExist(filePath) {
+  try {
+    return fs.existsSync(filePath);
+  } catch (error) {
+    // Handle any errors that may occur during the file existence check
+    console.error(`Error checking file existence: ${error.message}`);
+    return false; // Return false in case of an error
+  }
+}
+if (!doesFileExist(jsonDataFile)) {
+  fetchAndCombineCSVData(jsonDataFile);
+}
 app.get('/api/distributori', async (req, res) => {
   const MAX_RESULTS = 5;
   if (req.method === 'GET' && req.url.startsWith('/api/distributori')) {
@@ -177,7 +189,7 @@ app.get('/api/distributori', async (req, res) => {
     const distanceLimit = parseInt(urlParams.get('distance'));
     const fuel = urlParams.get('fuel').toLowerCase();
     maxItems = parseInt(urlParams.get('results'));
-    if(!maxItems) {
+    if (!maxItems) {
       maxItems = MAX_RESULTS;
     }
     if (isNaN(latitude) || isNaN(longitude) || isNaN(distanceLimit) || !fuel) {
@@ -185,7 +197,7 @@ app.get('/api/distributori', async (req, res) => {
       res.end(JSON.stringify({ error: 'Invalid latitude, longitude, distance or fuel values.' }));
       return;
     }
-    if(!hasFileBeenUpdatedWithin24Hours(jsonDataFile)) {
+    if (!hasFileBeenUpdatedWithin24Hours(jsonDataFile)) {
       console.log("Updating json file");
       fetchAndCombineCSVData(jsonDataFile);
     }

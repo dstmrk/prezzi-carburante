@@ -187,7 +187,7 @@ app.get('/api/distributori', async (req, res) => {
     const latitude = parseFloat(urlParams.get('latitude'));
     const longitude = parseFloat(urlParams.get('longitude'));
     const distanceLimit = parseInt(urlParams.get('distance'));
-    fuel = urlParams.get('fuel')
+    fuel = urlParams.get('fuel');
     maxItems = parseInt(urlParams.get('results'));
     if (!maxItems) {
       maxItems = MAX_RESULTS;

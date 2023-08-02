@@ -2,11 +2,6 @@ const express = require('express');
 const https = require('https');
 const fs = require('fs');
 
-const app = express();
-const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
-const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
-const jsonDataFile = "data.json";
-
 //Function to transform degrees in radiants
 function degToRad(deg) {
   return deg * (Math.PI / 180);
@@ -151,12 +146,16 @@ function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel
   return topFuel;
 }
 
-// Schedule to fetch and store the JSON data once per day at 11 am (24 hours)
+const app = express();
+const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
+const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
+const jsonDataFile = "data.json";
 const PORT = process.env.PORT || 8888;
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const updateTime = new Date();
 updateTime.setHours(11, 0, 0, 0);
 const timeToNextFetch = updateTime.getTime() - new Date().getTime();
+fetchAndCombineCSVData();
 setTimeout(() => {
   fetchAndCombineCSVData();
   setInterval(fetchAndCombineCSVData, millisecondsPerDay);

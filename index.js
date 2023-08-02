@@ -1,6 +1,9 @@
 const express = require('express');
 const https = require('https');
 const fs = require('fs');
+const app = express();
+const PORT = process.env.PORT || 8888;
+const jsonDataFile = "data.json";
 
 //Function to transform degrees in radiants
 function degToRad(deg) {
@@ -40,7 +43,9 @@ function isRecent(date) {
 }
 
 // Function to fetch and combine the CSV data into a dictionary
-function fetchAndCombineCSVData() {
+function fetchAndCombineCSVData(jsonDataFile) {
+  const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
+  const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
   const fetchData = (url, callback) => {
     https.get(url, (csvRes) => {
       let csvData = '';
@@ -110,7 +115,7 @@ function fetchAndCombineCSVData() {
 }
 
 // Function to read the JSON data from the file
-function readJSONData(callback) {
+function readJSONData(jsonDataFile, callback) {
   fs.readFile(jsonDataFile, 'utf8', (err, jsonData) => {
     if (err) {
       console.error(`Error reading JSON data from file: ${err.message}`);
@@ -146,21 +151,22 @@ function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel
   return topFuel;
 }
 
-const app = express();
-const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
-const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
-const jsonDataFile = "data.json";
-const PORT = process.env.PORT || 8888;
-const millisecondsPerDay = 24 * 60 * 60 * 1000;
-const updateTime = new Date();
-updateTime.setHours(11, 0, 0, 0);
-const timeToNextFetch = updateTime.getTime() - new Date().getTime();
-fetchAndCombineCSVData();
-setTimeout(() => {
-  fetchAndCombineCSVData();
-  setInterval(fetchAndCombineCSVData, millisecondsPerDay);
-}, timeToNextFetch);
+function hasFileBeenUpdatedWithin24Hours(filePath) {
+  try {
+    const stats = fs.statSync(filePath);
+    const lastModifiedTime = stats.mtime; // Last modification time of the file
+    const currentTime = new Date();
+    const timeDifference = currentTime.getTime() - lastModifiedTime.getTime();
+    const hoursDifference = timeDifference / (1000 * 60 * 60);
+    return hoursDifference < 24;
+  } catch (error) {
+    // Handle any errors that may occur during the file stat retrieval
+    console.error(`Error checking file status: ${error.message}`);
+    return false; // Return false in case of an error
+  }
+}
 
+fetchAndCombineCSVData(jsonDataFile);
 app.get('/api/distributori', async (req, res) => {
   const MAX_RESULTS = 5;
   if (req.method === 'GET' && req.url.startsWith('/api/distributori')) {
@@ -178,8 +184,12 @@ app.get('/api/distributori', async (req, res) => {
       res.end(JSON.stringify({ error: 'Invalid latitude, longitude, distance or fuel values.' }));
       return;
     }
+    if(!hasFileBeenUpdatedWithin24Hours(jsonDataFile)) {
+      console.log("Updating json file");
+      fetchAndCombineCSVData(jsonDataFile);
+    }
     // Load the JSON file and process it here.
-    readJSONData((data) => {
+    readJSONData(jsonDataFile, (data) => {
       topStations = calculateTopStations(data, latitude, longitude, distanceLimit, fuel, maxItems);
       // The response contains the N cheapest gas stations in the specified radius, for the given fuel
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -194,7 +204,5 @@ app.get('/api/distributori', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
-
-
 
 

@@ -57,3 +57,8 @@ esempio di risposta:
     }
 }
 ```
+
+## Supporto
+Se hai trovato utile questo codice, puoi offrirmi un caffé :)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/S6S41L5113)

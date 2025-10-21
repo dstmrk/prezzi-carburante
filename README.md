@@ -50,39 +50,39 @@ La risposta è un array JSON di oggetti, ordinati per prezzo crescente. Ogni ogg
 
 ```json
 [
-    {
-        "ranking": 1,
-        "gestore": "Economysrl",
-        "indirizzo": "24 del Monginevro, Km. 60, Nord - 10050 GRAVERE TO",
-        "prezzo": 1.948,
-        "self": true,
-        "data": "29/07/2023 08:13:55",
-        "distanza": "1.50",
-        "latitudine": 45.1271956771795,
-        "longitudine": 7.011626588954929
-    },
-    {
-        "ranking": 2,
-        "gestore": "Tamoil",
-        "indirizzo": "Statale 25 del Moncenisio, Km. 51 + 189, dir. Susa - 10059 SUSA TO",
-        "prezzo": 1.939,
-        "self": true,
-        "data": "01/08/2023 07:06:13",
-        "distanza": "5.01",
-        "latitudine": 45.137168355127265,
-        "longitudine": 7.070930600166321
-    },
-    {
-        "ranking": 3,
-        "gestore": "Api-Ip",
-        "indirizzo": "SUSA - fraz SAN GIULIANO - S.S. 25 KM. 49,469  10059 SUSA TO",
-        "prezzo": 1.939,
-        "self": false,
-        "data": "31/07/2023 17:01:44",
-        "distanza": "6.64",
-        "latitudine": 45.13802648847826,
-        "longitudine": 7.091783906745945
-    }
+  {
+    "ranking": 1,
+    "gestore": "Api-Ip",
+    "indirizzo": "SUSA - fraz SAN GIULIANO - S.S. 25 KM. 49,469  10059 SUSA TO",
+    "prezzo": 1.689,
+    "self": true,
+    "data": "19/10/2025 09:01:23",
+    "distanza": "6.64",
+    "latitudine": 45.1380264884783,
+    "longitudine": 7.09178390674595
+  },
+  {
+    "ranking": 2,
+    "gestore": "Agip Eni",
+    "indirizzo": "24 del Monginevro, Km. 55+260, monginevro - 10059 SUSA TO",
+    "prezzo": 1.689,
+    "self": true,
+    "data": "20/10/2025 07:28:08",
+    "distanza": "3.53",
+    "latitudine": 45.1350398248141,
+    "longitudine": 7.0515458745997
+  },
+  {
+    "ranking": 3,
+    "gestore": "Tamoil",
+    "indirizzo": "24 del Monginevro, Km. 60, Nord - 10050 GRAVERE TO",
+    "prezzo": 1.698,
+    "self": true,
+    "data": "15/10/2025 17:51:35",
+    "distanza": "1.50",
+    "latitudine": 45.1271956771795,
+    "longitudine": 7.01162658895493
+  }
 ]
 ```
 

@@ -43,7 +43,7 @@ Restituisce un elenco delle stazioni di servizio più economiche in base ai para
 #### Esempio di Utilizzo
 
 **Richiesta:**
-https://prezzi-carburante.onrender.com/api/distributori?latitude=45.14027999213074&longitude=7.007186940593831&distance=5&fuel=benzina&results=3
+https://prezzi-carburante.onrender.com/api/distributori?latitude=45.14027999213074&longitude=7.007186940593831&distance=10&fuel=benzina&results=3
 
 **Risposta (`200 OK`):**
 La risposta è un array JSON di oggetti, ordinati per prezzo crescente. Ogni oggetto include un campo `ranking` che indica la posizione nell'ordine.

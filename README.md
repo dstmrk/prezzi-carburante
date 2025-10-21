@@ -1,61 +1,89 @@
-# prezzi-carburante
-API per identificare i distributori di carburante più economici in base agli opendata disponibili su https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti.
+# Prezzi Carburante API
 
-API disponibile su: [https://prezzi-carburante.onrender.com/api/distributori](https://prezzi-carburante.onrender.com/api/distributori)
+API per identificare i distributori di carburante più economici in Italia, basata sugli open data del MIMIT.
 
-endpoint:
-distributori (GET)
+- **Fonte Dati:** [Carburanti - Prezzi praticati e anagrafica degli impianti](https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti)
+- **API Live:** `https://prezzi-carburante.onrender.com`
 
-parametri:
-```
-latitude:            latitudine del punto di ricerca (es. 46.19344671669768)
-longitude:           longitudine del punto di ricerca (es. 9.148853607434744)
-distance:            raggio di ricerca in km dalle coordinate specificate
-fuel:                tipo di carburante. I più comuni sono benzina, gasolio
-results (optional):  il numero di risultati da restituire. Se non è indicato, il default è 5
-```
+## Come usarlo
 
-output:
-un json contenente il numero di risultati trovati, con chiave per ogni elemento relativa all'ordine rispetto al prezzo più basso, e le informazioni su gestore, indirizzo, prezzo in €/l, indicazione self (0/1), data di aggiornamento dell'informazione, distanza in km dal punto di ricerca, latitudine e longitudine del distributore.
+1.  **Clona il repository:**
+    ```bash
+    git clone https://github.com/tuo-username/prezzi-carburante.git
+    cd prezzi-carburante
+    ```
 
+2.  **Installa le dipendenze:**
+    ```bash
+    npm install
+    ```
 
-esempio di query:
+3.  **Avvia il server di sviluppo:**
+    ```bash
+    node index.js
+    ```
+    Il server sarà disponibile su `http://localhost:8888`.
+
+## Riferimento API
+
+### GET `/api/distributori`
+
+Restituisce un elenco delle stazioni di servizio più economiche in base ai parametri di ricerca.
+
+#### Parametri della Query
+
+| Parametro   | Tipo      | Descrizione                                                                          |
+|-------------|-----------|--------------------------------------------------------------------------------------|
+| `latitude`  | `float`   | **Obbligatorio.** Latitudine del punto di ricerca (es. `45.4642`).                     |
+| `longitude` | `float`   | **Obbligatorio.** Longitudine del punto di ricerca (es. `9.1900`).                     |
+| `distance`  | `integer` | **Obbligatorio.** Raggio di ricerca in km (es. `5`).                                   |
+| `fuel`      | `string`  | **Obbligatorio.** Tipo di carburante (es. `benzina`, `gasolio`).                       |
+| `results`   | `integer` | *Opzionale.* Numero massimo di risultati da restituire. **Default: 5**.                  |
+
+#### Esempio di Utilizzo
+
+**Richiesta:**
 https://prezzi-carburante.onrender.com/api/distributori?latitude=45.14027999213074&longitude=7.007186940593831&distance=5&fuel=benzina&results=3
 
-esempio di risposta:
-```
-{
-    "1": {
-        "gestore": "Tamoil",
-        "indirizzo": "Statale 25 del Moncenisio, Km. 51 + 189, dir. Susa - 10059 SUSA TO",
-        "prezzo": "1.939",
-        "self": "1",
-        "data": "01/08/2023 07:06:13",
-        "distanza": "5.01",
-        "latitudine": "45.137168355127265",
-        "longitudine": "7.070930600166321"
-    },
-    "2": {
-        "gestore": "Api-Ip",
-        "indirizzo": "SUSA - fraz SAN GIULIANO - S.S. 25 KM. 49,469  10059 SUSA TO",
-        "prezzo": "1.939",
-        "self": "1",
-        "data": "31/07/2023 17:01:44",
-        "distanza": "6.64",
-        "latitudine": "45.13802648847826",
-        "longitudine": "7.091783906745945"
-    },
-    "3": {
+**Risposta (`200 OK`):**
+La risposta è un array JSON di oggetti, ordinati per prezzo crescente. Ogni oggetto include un campo `ranking` che indica la posizione nell'ordine.
+
+```json
+[
+    {
+        "ranking": 1,
         "gestore": "Economysrl",
         "indirizzo": "24 del Monginevro, Km. 60, Nord - 10050 GRAVERE TO",
-        "prezzo": "1.948",
-        "self": "1",
+        "prezzo": 1.948,
+        "self": true,
         "data": "29/07/2023 08:13:55",
         "distanza": "1.50",
-        "latitudine": "45.1271956771795",
-        "longitudine": "7.011626588954929"
+        "latitudine": 45.1271956771795,
+        "longitudine": 7.011626588954929
+    },
+    {
+        "ranking": 2,
+        "gestore": "Tamoil",
+        "indirizzo": "Statale 25 del Moncenisio, Km. 51 + 189, dir. Susa - 10059 SUSA TO",
+        "prezzo": 1.939,
+        "self": true,
+        "data": "01/08/2023 07:06:13",
+        "distanza": "5.01",
+        "latitudine": 45.137168355127265,
+        "longitudine": 7.070930600166321
+    },
+    {
+        "ranking": 3,
+        "gestore": "Api-Ip",
+        "indirizzo": "SUSA - fraz SAN GIULIANO - S.S. 25 KM. 49,469  10059 SUSA TO",
+        "prezzo": 1.939,
+        "self": false,
+        "data": "31/07/2023 17:01:44",
+        "distanza": "6.64",
+        "latitudine": 45.13802648847826,
+        "longitudine": 7.091783906745945
     }
-}
+]
 ```
 
 ## Supporto

@@ -1,222 +1,221 @@
 const express = require('express');
-const https = require('https');
-const fs = require('fs');
+const axios = require('axios');
+const fs = require('fs/promises');
+const path = require('path');
+const Papa = require('papaparse');
+
 const app = express();
 const PORT = process.env.PORT || 8888;
-const jsonDataFile = "data.json";
+const jsonDataFile = path.join(__dirname, 'data.json'); // Usa un percorso assoluto
 
-//Function to transform degrees in radiants
+// Funzioni di calcolo (invariate)
 function degToRad(deg) {
   return deg * (Math.PI / 180);
 }
 
-//Function to calculate the distance in km between two points, expressed in latitude/longitude
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth's radius in kilometers
-
+  const R = 6371; // Raggio della Terra in km
   const dLat = degToRad(lat2 - lat1);
   const dLon = degToRad(lon2 - lon1);
-
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(degToRad(lat1)) * Math.cos(degToRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  const distance = R * c;
-  return distance;
+  return R * c;
 }
 
-//Function to parse the string format of the files into a Date item
 function stringToDate(dateString) {
   const [datePart, timePart] = dateString.split(' ');
+  if (!datePart || !timePart) return null;
   const [day, month, year] = datePart.split('/');
   const [hour, minute, second] = timePart.split(':');
   return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
 }
 
-//Function to check if the passed date is a recent one or not (last 7 days)
 function isRecent(date) {
-  const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (!date) return false;
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   return date >= oneWeekAgo;
 }
 
-//Function to fetch and combine the CSV data into a dictionary
-function fetchAndCombineCSVData(jsonDataFile) {
-  const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
-  const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
-  const fetchData = (url, callback) => {
-    https.get(url, (csvRes) => {
-      let csvData = '';
-      console.log(`Loading file from ${url}`);
+// Funzione per scaricare e combinare i dati CSV (rifattorizzata con async/await)
+// Funzione per scaricare e combinare i dati CSV (rifattorizzata con async/await)
+async function fetchAndCombineCSVData() {
+  console.log('Fetching and combining CSV data...');
+  try {
+    const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
+    const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
 
-      csvRes.on('data', (chunk) => {
-        csvData += chunk;
-      });
+    // Scarica i file in parallelo
+    const [anagraficaResponse, prezziResponse] = await Promise.all([
+      axios.get(csvAnagraficaUrl, { responseType: 'arraybuffer' }), // Aggiunto per gestire encoding
+      axios.get(csvPrezziUrl, { responseType: 'arraybuffer' })      // Aggiunto per gestire encoding
+    ]);
 
-      csvRes.on('end', () => {
-        callback(csvData);
-      });
-    }).on('error', (err) => {
-      console.error(`Error fetching CSV: ${err.message}`);
-    });
-  };
+    // Decodifica i dati gestendo l'encoding ISO-8859-1 (comune nei file ministeriali)
+    const anagraficaCsvString = new TextDecoder('iso-8859-1').decode(anagraficaResponse.data);
+    const prezziCsvString = new TextDecoder('iso-8859-1').decode(prezziResponse.data);
 
-  fetchData(csvAnagraficaUrl, (csvAnagraficaData) => {
-    fetchData(csvPrezziUrl, (csvPrezziData) => {
-      // Combine data from the two files into a dictionary
-      const anagraficaRows = csvAnagraficaData.split('\n');
-      const prezziRows = csvPrezziData.split('\n');
-      const dataDictionary = {};
+    // Parsing dei CSV
+    const anagraficaData = Papa.parse(anagraficaCsvString, { delimiter: ';', skipEmptyLines: true }).data;
+    const prezziData = Papa.parse(prezziCsvString, { delimiter: ';', skipEmptyLines: true }).data;
 
-      // Process data from the first file (csvAnagraficaData)
-      for (const row of anagraficaRows) {
-        const columns = row.split(';');
-        if (columns.length >= 9) {
-          const key = columns[0];
-          if (!isNaN(key)) {
-            const value = columns.slice(1);
-            dataDictionary[key] = { gestore: value[1], indirizzo: value[4] + " " + value[5] + " " + value[6], latitudine: value[7], longitudine: value[8], prezzi: {} };
-          }
+    const dataDictionary = {};
+
+    // Processa dati anagrafica (SKIPPA LA PRIMA RIGA DI INTESTAZIONE)
+    for (const row of anagraficaData.slice(1)) {
+      // AGGIUNTA: Controlla che la riga abbia abbastanza colonne per evitare errori
+      if (row && row.length > 9) {
+        const idImpianto = row[0];
+        if (idImpianto && !isNaN(idImpianto) && row[8] && row[9]) { // Controllo extra per lat/lon
+          dataDictionary[idImpianto] = {
+            gestore: row[2],
+            indirizzo: `${row[5]} ${row[6]} ${row[7]}`,
+            latitudine: parseFloat(row[8].replace(',', '.')),
+            longitudine: parseFloat(row[9].replace(',', '.')),
+            prezzi: {}
+          };
         }
-      }
-
-      // Process data from the second file (csvPrezziData) and add to the dictionary
-      for (const row of prezziRows) {
-        const columns = row.split(';');
-        if (columns.length >= 2) {
-          const key = columns[0];
-          const value = columns.slice(1);
-          if (dataDictionary[key]) {
-            carburante = value[0].toLowerCase();
-            price = value[1];
-            if (!dataDictionary[key]["prezzi"][carburante] || dataDictionary[key]["prezzi"][carburante]["prezzo"] > price) {
-              dataDictionary[key]["prezzi"][carburante] = { prezzo: price, self: value[2], data: value[3] }
-            }
-          }
-        }
-      }
-
-
-      // Now you have the combined data in the dataDictionary variable
-      // Convert the dictionary data to JSON and store it in a file
-      const jsonData = JSON.stringify(dataDictionary, null, 2);
-      fs.writeFile(jsonDataFile, jsonData, (err) => {
-        if (err) {
-          console.error(`Error writing JSON data to file: ${err.message}`);
-        } else {
-          console.log('Updated data stored successfully in JSON file.');
-        }
-      });
-    });
-  });
-}
-
-//Function to read the JSON data from the file
-function readJSONData(jsonDataFile, callback) {
-  fs.readFile(jsonDataFile, 'utf8', (err, jsonData) => {
-    if (err) {
-      console.error(`Error reading JSON data from file: ${err.message}`);
-    } else {
-      try {
-        const data = JSON.parse(jsonData);
-        callback(data);
-      } catch (error) {
-        console.error(`Error parsing JSON data: ${error.message}`);
       }
     }
-  });
+
+    // Processa dati prezzi (SKIPPA LA PRIMA RIGA DI INTESTAZIONE)
+    for (const row of prezziData.slice(1)) {
+       // AGGIUNTA: Controlla che la riga abbia abbastanza colonne
+      if (row && row.length > 4) {
+        const idImpianto = row[0];
+        if (dataDictionary[idImpianto] && row[1] && row[2]) { // Controllo extra per tipo e prezzo
+          const fuelType = row[1].toLowerCase();
+          const price = parseFloat(row[2].replace(',', '.'));
+          const existingPrice = dataDictionary[idImpianto].prezzi[fuelType]?.prezzo;
+
+          if (!isNaN(price) && (!existingPrice || price < existingPrice)) {
+            dataDictionary[idImpianto].prezzi[fuelType] = {
+              prezzo: price,
+              self: row[3] === '1',
+              data: row[4]
+            };
+          }
+        }
+      }
+    }
+
+    await fs.writeFile(jsonDataFile, JSON.stringify(dataDictionary, null, 2));
+    console.log('Updated data stored successfully in JSON file.');
+  } catch (error) {
+    console.error(`Error fetching or processing CSV data: ${error.message}`);
+    // Aggiungo uno stack trace per un debug più facile
+    console.error(error.stack);
+  }
 }
 
-//Function to calculate the top stations per price
+// Funzione per leggere i dati JSON (rifattorizzata)
+async function readJSONData() {
+  try {
+    const jsonData = await fs.readFile(jsonDataFile, 'utf8');
+    return JSON.parse(jsonData);
+  } catch (error) {
+    console.error(`Error reading or parsing JSON data: ${error.message}`);
+    return null;
+  }
+}
+
+// Funzione per calcolare le stazioni migliori (rifattorizzata e semplificata)
+// Funzione per calcolare le stazioni migliori (rifattorizzata e con aggiunta della posizione)
 function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel, maxItems) {
-  topFuel = {};
-  for (const key in jsonData) {
-    const rowLatitude = jsonData[key]["latitudine"];
-    const rowLongitude = jsonData[key]["longitudine"];
-    const distance = calculateDistance(latitude, longitude, rowLatitude, rowLongitude);
-    if (distance <= distanceLimit) {
-      if (jsonData[key]["prezzi"][fuel] && isRecent(stringToDate(jsonData[key]["prezzi"][fuel]["data"]))) {
-        element = { gestore: jsonData[key]["gestore"], indirizzo: jsonData[key]["indirizzo"], prezzo: jsonData[key]["prezzi"][fuel]["prezzo"], self: jsonData[key]["prezzi"][fuel]["self"], data: jsonData[key]["prezzi"][fuel]["data"], distanza: distance.toFixed(2), latitudine: jsonData[key]["latitudine"], longitudine: jsonData[key]["longitudine"] };
-        for (i = 1; i <= maxItems; i++) {
-          if (!topFuel[i] || element["prezzo"] < topFuel[i]["prezzo"]) {
-            topFuel[i] = element;
-            break;
-          }
+    const stations = Object.values(jsonData);
+
+    const validStations = stations.filter(station => {
+        const stationFuel = station.prezzi[fuel];
+        if (!stationFuel || !isRecent(stringToDate(stationFuel.data))) {
+            return false;
         }
-      }
-    }
-  }
-  return topFuel;
-}
 
-//Function to check if the json file has been updated in the latest 24 hours
-function hasFileBeenUpdatedWithin24Hours(filePath) {
-  try {
-    const stats = fs.statSync(filePath);
-    const lastModifiedTime = stats.mtime; // Last modification time of the file
-    const currentTime = new Date();
-    const timeDifference = currentTime.getTime() - lastModifiedTime.getTime();
-    const hoursDifference = timeDifference / (1000 * 60 * 60);
-    return hoursDifference < 24;
-  } catch (error) {
-    // Handle any errors that may occur during the file stat retrieval
-    console.error(`Error checking file status: ${error.message}`);
-    return false; // Return false in case of an error
-  }
-}
+        const distance = calculateDistance(latitude, longitude, station.latitudine, station.longitudine);
+        if (distance > distanceLimit) {
+            return false;
+        }
 
-// Function to check if a file exists at the given path
-function doesFileExist(filePath) {
-  try {
-    return fs.existsSync(filePath);
-  } catch (error) {
-    // Handle any errors that may occur during the file existence check
-    console.error(`Error checking file existence: ${error.message}`);
-    return false; // Return false in case of an error
-  }
-}
-if (!doesFileExist(jsonDataFile)) {
-  fetchAndCombineCSVData(jsonDataFile);
-}
-app.get('/api/distributori', async (req, res) => {
-  const MAX_RESULTS = 5;
-  if (req.method === 'GET' && req.url.startsWith('/api/distributori')) {
-    const urlParams = new URLSearchParams(req.url.split('?')[1]);
-    const latitude = parseFloat(urlParams.get('latitude'));
-    const longitude = parseFloat(urlParams.get('longitude'));
-    const distanceLimit = parseInt(urlParams.get('distance'));
-    fuel = urlParams.get('fuel');
-    maxItems = parseInt(urlParams.get('results'));
-    if (!maxItems) {
-      maxItems = MAX_RESULTS;
-    }
-    if (isNaN(latitude) || isNaN(longitude) || isNaN(distanceLimit) || !fuel) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid latitude, longitude, distance or fuel values.' }));
-      return;
-    }
-    fuel = fuel.toLowerCase();
-    if (!hasFileBeenUpdatedWithin24Hours(jsonDataFile)) {
-      console.log("Updating json file");
-      fetchAndCombineCSVData(jsonDataFile);
-    }
-    // Load the JSON file and process it here.
-    readJSONData(jsonDataFile, (data) => {
-      topStations = calculateTopStations(data, latitude, longitude, distanceLimit, fuel, maxItems);
-      // The response contains the N cheapest gas stations in the specified radius, for the given fuel
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(topStations));
+        // Aggiunge la distanza all'oggetto per non ricalcolarla
+        station.distanza = distance;
+        return true;
     });
-  } else {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not found.' }));
+
+    // Ordina per prezzo crescente
+    validStations.sort((a, b) => a.prezzi[fuel].prezzo - b.prezzi[fuel].prezzo);
+
+    // Restituisce i risultati aggiungendo il campo "posizione"
+    return validStations.slice(0, maxItems).map((s, index) => ({
+        ranking: index + 1, // <-- ECCO LA NUOVA INFORMAZIONE
+        gestore: s.gestore,
+        indirizzo: s.indirizzo,
+        prezzo: s.prezzi[fuel].prezzo,
+        self: s.prezzi[fuel].self,
+        data: s.prezzi[fuel].data,
+        distanza: s.distanza.toFixed(2), // Formattiamo qui la distanza
+        latitudine: s.latitudine,
+        longitudine: s.longitudine
+    }));
+}
+
+// Funzione per verificare se il file è stato aggiornato di recente (rifattorizzata)
+async function isFileUpdatedWithin(filePath, hours) {
+  try {
+    const stats = await fs.stat(filePath);
+    const timeDifference = Date.now() - stats.mtime.getTime();
+    const hoursDifference = timeDifference / (1000 * 60 * 60);
+    return hoursDifference < hours;
+  } catch (error) {
+    // Se il file non esiste, ritorna false
+    if (error.code === 'ENOENT') {
+      return false;
+    }
+    console.error(`Error checking file status: ${error.message}`);
+    return false;
+  }
+}
+
+// Route API (rifattorizzata)
+app.get('/api/distributori', async (req, res) => {
+  try {
+    const { latitude, longitude, distance, fuel, results } = req.query;
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(longitude);
+    const distLimit = parseInt(distance, 10);
+    const maxItems = parseInt(results, 10) || 5;
+
+    if (isNaN(lat) || isNaN(lon) || isNaN(distLimit) || !fuel) {
+      return res.status(400).json({ error: 'Invalid latitude, longitude, distance or fuel values.' });
+    }
+
+    // Controlla e aggiorna il file JSON se necessario
+    const isUpToDate = await isFileUpdatedWithin(jsonDataFile, 24);
+    if (!isUpToDate) {
+      console.log("Updating json file as it's old or missing.");
+      await fetchAndCombineCSVData();
+    }
+
+    const data = await readJSONData();
+    if (!data) {
+        return res.status(500).json({ error: 'Could not load fuel station data.' });
+    }
+
+    const topStations = calculateTopStations(data, lat, lon, distLimit, fuel.toLowerCase(), maxItems);
+    res.status(200).json(topStations);
+
+  } catch (error) {
+    console.error('Error in /api/distributori:', error);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
+// Avvio del server
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
+  // Opzionale: esegue un primo fetch all'avvio se il file non esiste
+  isFileUpdatedWithin(jsonDataFile, 24).then(isUpToDate => {
+      if (!isUpToDate) {
+          fetchAndCombineCSVData();
+      }
+  });
 });
-
-

@@ -1,5 +1,8 @@
 # Prezzi Carburante API
 
+![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+
 API per identificare i distributori di carburante più economici in Italia, basata sugli open data del MIMIT.
 
 - **Fonte Dati:** [Carburanti - Prezzi praticati e anagrafica degli impianti](https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti)

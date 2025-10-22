@@ -39,7 +39,6 @@ function isRecent(date) {
 }
 
 // Funzione per scaricare e combinare i dati CSV (rifattorizzata con async/await)
-// Funzione per scaricare e combinare i dati CSV (rifattorizzata con async/await)
 async function fetchAndCombineCSVData() {
   console.log('Fetching and combining CSV data...');
   try {
@@ -120,7 +119,6 @@ async function readJSONData() {
   }
 }
 
-// Funzione per calcolare le stazioni migliori (rifattorizzata e semplificata)
 // Funzione per calcolare le stazioni migliori (rifattorizzata e con aggiunta della posizione)
 function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel, maxItems) {
     const stations = Object.values(jsonData);

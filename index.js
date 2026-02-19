@@ -56,8 +56,8 @@ async function fetchAndCombineCSVData() {
     const prezziCsvString = new TextDecoder('iso-8859-1').decode(prezziResponse.data);
 
     // Parsing dei CSV
-    const anagraficaData = Papa.parse(anagraficaCsvString, { delimiter: ';', skipEmptyLines: true }).data;
-    const prezziData = Papa.parse(prezziCsvString, { delimiter: ';', skipEmptyLines: true }).data;
+    const anagraficaData = Papa.parse(anagraficaCsvString, { delimiter: '|', skipEmptyLines: true }).data;
+    const prezziData = Papa.parse(prezziCsvString, { delimiter: '|', skipEmptyLines: true }).data;
 
     const dataDictionary = {};
 

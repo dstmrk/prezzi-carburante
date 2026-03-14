@@ -207,6 +207,39 @@ app.get('/api/distributori', async (req, res) => {
   }
 });
 
+app.get('/api/prezzo', async (req, res) => {
+  try {
+    const { stationID, fuel, textonly, comma_separator} = req.query;
+
+    const data = await readJSONData();
+    if (!data) {
+      return res.status(500).json({ error: 'Could not load fuel station data.' });
+    }
+    
+    const station = data[stationID];
+    if (!station) {
+      return res.status(404).json({ error: 'Station not found.' });
+    }
+    const fuelData = station.prezzi[fuel.toLowerCase()];
+    if (!fuelData) {
+      return res.status(404).json({ error: 'Fuel type not found for this station.' });
+    }
+    
+    const price = {
+      gestore: station.gestore,
+      indirizzo: station.indirizzo,
+      prezzo: (comma_separator == 'true' ? fuelData.prezzo.toString().replace('.', ',') : fuelData.prezzo),
+      self: fuelData.self,
+      data: fuelData.data
+    };
+
+    res.status(200).send(textonly === 'true' ? price.prezzo : price);
+  } catch (error) {
+    console.error('Error in /api/prezzo:', error);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 // Avvio del server
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);

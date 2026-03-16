@@ -209,7 +209,7 @@ app.get('/api/distributori', async (req, res) => {
 
 app.get('/api/prezzo', async (req, res) => {
   try {
-    const { stationID, fuel, textonly, comma_separator} = req.query;
+    const { stationID, fuel, output } = req.query;
 
     const data = await readJSONData();
     if (!data) {
@@ -228,12 +228,12 @@ app.get('/api/prezzo', async (req, res) => {
     const price = {
       gestore: station.gestore,
       indirizzo: station.indirizzo,
-      prezzo: (comma_separator == 'true' ? fuelData.prezzo.toString().replace('.', ',') : fuelData.prezzo),
+      prezzo: fuelData.prezzo,
       self: fuelData.self,
       data: fuelData.data
     };
 
-    res.status(200).send(textonly === 'true' ? price.prezzo : price);
+    res.status(200).send(output === 'text' ? String(price.prezzo).replace(".", ",") : price);
   } catch (error) {
     console.error('Error in /api/prezzo:', error);
     res.status(500).json({ error: 'Internal server error.' });

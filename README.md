@@ -89,6 +89,19 @@ La risposta è un array JSON di oggetti, ordinati per prezzo crescente. Ogni ogg
 ]
 ```
 
+### GET `/api/prezzo`
+Restituisce le informazioni e il prezzo della stazione di servizio richiesta.
+
+#### Parametri della Query
+| Parametro   | Tipo      | Descrizione                                                                |
+| ----------- | --------- | -------------------------------------------------------------------------- |
+| `stationID` | `integer` | **Obbligatorio.** Identificativo della stazione di servizio (es. `28617`). |
+| `fuel`      | `string`  | **Obbligatorio.** Tipo di carburante (es. `benzina`, `gasolio`).           |
+| `output`    | `integer` | *Opzionale.* Formato della risposta. **Default:** `json`                   |
+
+Il tipo di `output` può essere impostato a `text`: in tal caso viene restituito esclusivamente il prezzo del carburante utilizzando la virgola come separatore decimale (es. `1,879`).
+
+
 ## Supporto
 Se hai trovato utile questo codice, puoi offrirmi un caffé :)
 

@@ -113,7 +113,8 @@ https://prezzi-carburante.onrender.com/api/prezzo?stationID=28617&fuel=benzina
   "indirizzo":"SUSA - fraz SAN GIULIANO - S.S. 25 KM. 49,469  10059 SUSA TO",
   "prezzo":1.899,
   "self":true,
-  "data":"17/03/2026 09:02:05"}
+  "data":"17/03/2026 09:02:05"
+}
 ```
 
 **Risposta con `output=text`:**

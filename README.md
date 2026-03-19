@@ -109,17 +109,16 @@ https://prezzi-carburante.onrender.com/api/prezzo?stationID=28617&fuel=benzina
 **Risposta (`200 OK`):**
 ```json
 {
-  "gestore": "Agip Eni",
-  "indirizzo": "VIA ROMA 1 - 10100 TORINO TO",
-  "prezzo": 1.879,
-  "self": true,
-  "data": "19/10/2025 08:45:00"
-}
+  "gestore":"Api-Ip",
+  "indirizzo":"SUSA - fraz SAN GIULIANO - S.S. 25 KM. 49,469  10059 SUSA TO",
+  "prezzo":1.899,
+  "self":true,
+  "data":"17/03/2026 09:02:05"}
 ```
 
 **Risposta con `output=text`:**
 ```
-1,879
+1,899
 ```
 
 

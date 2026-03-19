@@ -101,6 +101,29 @@ Restituisce le informazioni e il prezzo della stazione di servizio richiesta.
 
 Il tipo di `output` può essere impostato a `text`: in tal caso viene restituito esclusivamente il prezzo del carburante utilizzando la virgola come separatore decimale (es. `1,879`).
 
+#### Esempio di Utilizzo
+
+**Richiesta:**
+```
+https://prezzi-carburante.onrender.com/api/prezzo?stationID=28617&fuel=benzina
+```
+
+**Risposta (`200 OK`):**
+```json
+{
+  "gestore": "Agip Eni",
+  "indirizzo": "VIA ROMA 1 - 10100 TORINO TO",
+  "prezzo": 1.879,
+  "self": true,
+  "data": "19/10/2025 08:45:00"
+}
+```
+
+**Risposta con `output=text`:**
+```
+1,879
+```
+
 
 ## Supporto
 Se hai trovato utile questo codice, puoi offrirmi un caffé :)

@@ -211,6 +211,10 @@ app.get('/api/prezzo', async (req, res) => {
   try {
     const { stationID, fuel, output } = req.query;
 
+    if (!stationID || !fuel) {
+      return res.status(400).json({ error: 'stationID and fuel are required.' });
+    }
+
     const data = await readJSONData();
     if (!data) {
       return res.status(500).json({ error: 'Could not load fuel station data.' });

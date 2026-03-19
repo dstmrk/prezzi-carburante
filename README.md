@@ -104,9 +104,7 @@ Il tipo di `output` può essere impostato a `text`: in tal caso viene restituito
 #### Esempio di Utilizzo
 
 **Richiesta:**
-```
 https://prezzi-carburante.onrender.com/api/prezzo?stationID=28617&fuel=benzina
-```
 
 **Risposta (`200 OK`):**
 ```json

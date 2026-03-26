@@ -4,7 +4,8 @@
   "description": "API per identificare i distributori di carburante più economici in Italia, basata sugli open data del MIMIT",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
@@ -27,8 +28,5 @@
     "axios": "^1.13.6",
     "express": "^5.2.1",
     "papaparse": "^5.5.3"
-  },
-   "engines": {
-    "node": ">=18.0.0"
   }
 }

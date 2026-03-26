@@ -8,7 +8,6 @@ const app = express();
 const PORT = process.env.PORT || 8888;
 const jsonDataFile = path.join(__dirname, 'data.json'); // Usa un percorso assoluto
 
-// Funzioni di calcolo (invariate)
 function degToRad(deg) {
   return deg * (Math.PI / 180);
 }
@@ -38,7 +37,122 @@ function isRecent(date) {
   return date >= oneWeekAgo;
 }
 
-// Funzione per scaricare e combinare i dati CSV (rifattorizzata con async/await)
+function normalizeHeader(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function parseCsvRows(csvString) {
+  return Papa.parse(csvString, { delimiter: '|', skipEmptyLines: true }).data;
+}
+
+function findHeaderRowIndex(rows, requiredHeaders) {
+  return rows.findIndex((row) => {
+    if (!Array.isArray(row)) {
+      return false;
+    }
+
+    const normalizedRow = row.map(normalizeHeader);
+    return requiredHeaders.every((header) => normalizedRow.includes(normalizeHeader(header)));
+  });
+}
+
+function parseCsvTable(csvString, requiredHeaders) {
+  const rows = parseCsvRows(csvString);
+  const headerRowIndex = findHeaderRowIndex(rows, requiredHeaders);
+
+  if (headerRowIndex === -1) {
+    throw new Error(`CSV header not found. Expected headers: ${requiredHeaders.join(', ')}`);
+  }
+
+  const headerRow = rows[headerRowIndex].map(normalizeHeader);
+
+  return rows.slice(headerRowIndex + 1).reduce((records, row) => {
+    if (!Array.isArray(row) || row.every((cell) => String(cell || '').trim() === '')) {
+      return records;
+    }
+
+    const record = {};
+    headerRow.forEach((header, index) => {
+      record[header] = typeof row[index] === 'string' ? row[index].trim() : row[index];
+    });
+    records.push(record);
+    return records;
+  }, []);
+}
+
+function getField(record, fieldNames) {
+  for (const fieldName of fieldNames) {
+    const value = record[fieldName];
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function parseNumericValue(value) {
+  if (value === undefined || value === null || value === '') {
+    return NaN;
+  }
+
+  return parseFloat(String(value).replace(',', '.'));
+}
+
+function buildDataDictionary(anagraficaRecords, prezziRecords) {
+  const dataDictionary = {};
+
+  for (const record of anagraficaRecords) {
+    const idImpianto = getField(record, ['idimpianto']);
+    const latitudine = parseNumericValue(getField(record, ['latitudine']));
+    const longitudine = parseNumericValue(getField(record, ['longitudine']));
+
+    if (!idImpianto || isNaN(latitudine) || isNaN(longitudine)) {
+      continue;
+    }
+
+    const gestore = getField(record, ['bandiera', 'gestore', 'nome impianto']);
+    const indirizzo = [
+      getField(record, ['indirizzo']),
+      getField(record, ['comune']),
+      getField(record, ['provincia'])
+    ].filter(Boolean).join(' ');
+
+    dataDictionary[idImpianto] = {
+      gestore,
+      indirizzo,
+      latitudine,
+      longitudine,
+      prezzi: {}
+    };
+  }
+
+  for (const record of prezziRecords) {
+    const idImpianto = getField(record, ['idimpianto']);
+    const fuelType = getField(record, ['desccarburante']).toLowerCase();
+    const price = parseNumericValue(getField(record, ['prezzo']));
+
+    if (!dataDictionary[idImpianto] || !fuelType || isNaN(price)) {
+      continue;
+    }
+
+    const existingPrice = dataDictionary[idImpianto].prezzi[fuelType]?.prezzo;
+    if (!existingPrice || price < existingPrice) {
+      dataDictionary[idImpianto].prezzi[fuelType] = {
+        prezzo: price,
+        self: getField(record, ['isself']) === '1',
+        data: getField(record, ['dtcomu'])
+      };
+    }
+  }
+
+  return dataDictionary;
+}
+
 async function fetchAndCombineCSVData() {
   console.log('Fetching and combining CSV data...');
   try {
@@ -55,49 +169,20 @@ async function fetchAndCombineCSVData() {
     const anagraficaCsvString = new TextDecoder('iso-8859-1').decode(anagraficaResponse.data);
     const prezziCsvString = new TextDecoder('iso-8859-1').decode(prezziResponse.data);
 
-    // Parsing dei CSV
-    const anagraficaData = Papa.parse(anagraficaCsvString, { delimiter: '|', skipEmptyLines: true }).data;
-    const prezziData = Papa.parse(prezziCsvString, { delimiter: '|', skipEmptyLines: true }).data;
-
-    const dataDictionary = {};
-
-    // Processa dati anagrafica (SKIPPA LA PRIMA RIGA DI INTESTAZIONE)
-    for (const row of anagraficaData.slice(1)) {
-      // AGGIUNTA: Controlla che la riga abbia abbastanza colonne per evitare errori
-      if (row && row.length > 9) {
-        const idImpianto = row[0];
-        if (idImpianto && !isNaN(idImpianto) && row[8] && row[9]) { // Controllo extra per lat/lon
-          dataDictionary[idImpianto] = {
-            gestore: row[2],
-            indirizzo: `${row[5]} ${row[6]} ${row[7]}`,
-            latitudine: parseFloat(row[8].replace(',', '.')),
-            longitudine: parseFloat(row[9].replace(',', '.')),
-            prezzi: {}
-          };
-        }
-      }
-    }
-
-    // Processa dati prezzi (SKIPPA LA PRIMA RIGA DI INTESTAZIONE)
-    for (const row of prezziData.slice(1)) {
-       // AGGIUNTA: Controlla che la riga abbia abbastanza colonne
-      if (row && row.length > 4) {
-        const idImpianto = row[0];
-        if (dataDictionary[idImpianto] && row[1] && row[2]) { // Controllo extra per tipo e prezzo
-          const fuelType = row[1].toLowerCase();
-          const price = parseFloat(row[2].replace(',', '.'));
-          const existingPrice = dataDictionary[idImpianto].prezzi[fuelType]?.prezzo;
-
-          if (!isNaN(price) && (!existingPrice || price < existingPrice)) {
-            dataDictionary[idImpianto].prezzi[fuelType] = {
-              prezzo: price,
-              self: row[3] === '1',
-              data: row[4]
-            };
-          }
-        }
-      }
-    }
+    const anagraficaRecords = parseCsvTable(anagraficaCsvString, [
+      'idImpianto',
+      'Indirizzo',
+      'Latitudine',
+      'Longitudine'
+    ]);
+    const prezziRecords = parseCsvTable(prezziCsvString, [
+      'idImpianto',
+      'descCarburante',
+      'prezzo',
+      'isSelf',
+      'dtComu'
+    ]);
+    const dataDictionary = buildDataDictionary(anagraficaRecords, prezziRecords);
 
     await fs.writeFile(jsonDataFile, JSON.stringify(dataDictionary, null, 2));
     console.log('Updated data stored successfully in JSON file.');
@@ -173,7 +258,6 @@ async function isFileUpdatedWithin(filePath, hours) {
   }
 }
 
-// Route API (rifattorizzata)
 app.get('/api/distributori', async (req, res) => {
   try {
     const { latitude, longitude, distance, fuel, results } = req.query;
@@ -244,13 +328,34 @@ app.get('/api/prezzo', async (req, res) => {
   }
 });
 
-// Avvio del server
-app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-  // Opzionale: esegue un primo fetch all'avvio se il file non esiste
-  isFileUpdatedWithin(jsonDataFile, 24).then(isUpToDate => {
+function startServer() {
+  return app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`);
+    isFileUpdatedWithin(jsonDataFile, 24).then(isUpToDate => {
       if (!isUpToDate) {
-          fetchAndCombineCSVData();
+        fetchAndCombineCSVData();
       }
+    });
   });
-});
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  app,
+  buildDataDictionary,
+  calculateDistance,
+  calculateTopStations,
+  fetchAndCombineCSVData,
+  findHeaderRowIndex,
+  isFileUpdatedWithin,
+  isRecent,
+  normalizeHeader,
+  parseCsvRows,
+  parseCsvTable,
+  readJSONData,
+  startServer,
+  stringToDate
+};

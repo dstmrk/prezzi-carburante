@@ -6,6 +6,8 @@ const Papa = require('papaparse');
 
 const app = express();
 const PORT = process.env.PORT || 8888;
+
+app.use(express.static(path.join(__dirname, 'public')));
 const jsonDataFile = path.join(__dirname, 'data.json'); // Usa un percorso assoluto
 
 function degToRad(deg) {

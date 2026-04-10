@@ -5,15 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prezzi Carburante Italia</title>
   
-  <!-- Font Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <!-- Tailwind personalizzato -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
   <script>
     tailwind.config = {
       theme: {
@@ -23,11 +19,9 @@
             background: '#09090b',
             card: '#18181b',
             border: '#27272a',
-            primary: '#10b981', // Emerald
-            'primary-foreground': '#000000',
+            primary: '#10b981',
             muted: '#a1a1aa'
-          },
-          borderRadius: { 'sm': '0.375rem' }
+          }
         }
       }
     }
@@ -47,18 +41,16 @@
         <span class="text-primary">⛽</span> Prezzi Carburante
       </h1>
 
-      <!-- Ricerca -->
       <div class="mb-6 space-y-2">
         <label class="text-xs font-medium text-muted">Cerca città o indirizzo</label>
         <div class="flex gap-2">
-          <input id="citySearch" type="text" placeholder="Roma, Milano..." 
+          <input id="citySearch" type="text" placeholder="Es: Roma" 
                  class="flex-1 bg-background border border-border rounded-sm p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
                  onkeydown="if(event.key === 'Enter') searchCity()">
           <button onclick="searchCity()" class="bg-border hover:bg-zinc-700 px-4 rounded-sm">🔎</button>
         </div>
       </div>
 
-      <!-- Sezione PERCORSO -->
       <div class="border-t border-border pt-6 mt-6">
         <h2 class="text-sm font-semibold mb-3 text-primary">🛣️ Analisi Percorso</h2>
         <button onclick="toggleDrawing()" id="drawBtn" class="w-full bg-primary text-black font-semibold py-2 rounded-sm text-sm hover:bg-emerald-600">
@@ -85,7 +77,6 @@
         <div id="routeResults" class="mt-4 space-y-2"></div>
       </div>
 
-      <!-- Controlli -->
       <div class="space-y-4 mt-8 pt-6 border-t border-border">
         <div>
           <label class="text-xs text-muted block mb-1">Carburante</label>
@@ -101,6 +92,9 @@
           <label class="text-xs text-muted block mb-1">Raggio (km): <span id="distanceValue">5 km</span></label>
           <input type="range" id="distance" min="1" max="25" value="5" class="w-full accent-primary">
         </div>
+        
+        <!-- Re-introdotto il campo mancante per il numero di risultati -->
+        <input type="hidden" id="results" value="15">
 
         <button onclick="cerca()" class="w-full bg-primary text-black font-semibold py-3 rounded-sm hover:bg-emerald-600 transition">
           🔎 Cerca distributori
@@ -113,11 +107,9 @@
       <div id="lista" class="mt-8 space-y-3"></div>
     </div>
 
-    <!-- Mappa -->
     <div id="map" class="flex-1"></div>
   </div>
 
-  <!-- SCRIPT (La tua logica originale identica) -->
   <script>
     let map, markers = [], searchMarker = null, currentLat = null, currentLon = null;
     let routePoints = [], routePolyline = null, routeMarkers = [], isDrawing = false;
@@ -125,39 +117,34 @@
 
     function initMap() {
       map = L.map('map').setView([41.9028, 12.4964], 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+      // Mappa chiara standard
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
       map.on('click', (e) => {
         if (isDrawing) { routePoints.push(e.latlng); redrawRoutePolyline(); updateRouteLength(); }
         else setSearchCenter(e.latlng);
       });
     }
 
-        function setSearchCenter(latlng) {
+    // --- FUNZIONI ORIGINALI INSERITE ---
+    function setSearchCenter(latlng) {
       if (searchMarker) map.removeLayer(searchMarker);
-      searchMarker = L.marker(latlng, { draggable: true })
-        .addTo(map)
-        .bindPopup('📍 Centro di ricerca<br>Trascina per spostare')
-        .openPopup();
-      searchMarker.on('dragend', function() {
-        const pos = searchMarker.getLatLng();
-        currentLat = pos.lat; currentLon = pos.lng;
-      });
+      searchMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup('📍 Centro').openPopup();
+      searchMarker.on('dragend', () => { const pos = searchMarker.getLatLng(); currentLat = pos.lat; currentLon = pos.lng; });
       currentLat = latlng.lat; currentLon = latlng.lng;
     }
 
     function redrawRoutePolyline() {
       if (routePolyline) map.removeLayer(routePolyline);
       if (routePoints.length < 1) return;
-      routePolyline = L.polyline(routePoints, {
-        color: '#84cc16', weight: 6, dashArray: '12, 8', opacity: 0.85
-      }).addTo(map);
+      routePolyline = L.polyline(routePoints, { color: '#10b981', weight: 6, dashArray: '12, 8', opacity: 0.85 }).addTo(map);
     }
 
     function updateRouteLength() {
       let length = 0;
-      for (let i = 1; i < routePoints.length; i++) {
-        length += routePoints[i-1].distanceTo(routePoints[i]);
-      }
+      for (let i = 1; i < routePoints.length; i++) length += routePoints[i-1].distanceTo(routePoints[i]);
       document.getElementById('routeLength').textContent = (length / 1000).toFixed(1) + ' km';
     }
 
@@ -165,217 +152,87 @@
       isDrawing = !isDrawing;
       const btn = document.getElementById('drawBtn');
       const controls = document.getElementById('routeControls');
-      if (isDrawing) {
-        btn.innerHTML = '🛑 Stoppa disegno percorso';
-        controls.classList.remove('hidden');
-        routePoints = [];
-        if (routePolyline) map.removeLayer(routePolyline);
-        routePolyline = null;
-        document.getElementById('routeLength').textContent = '0.0 km';
-      } else {
-        btn.innerHTML = '✏️ Disegna percorso sulla mappa';
-        controls.classList.add('hidden');
-      }
+      if (isDrawing) { btn.innerHTML = '🛑 Stop Disegno'; controls.classList.remove('hidden'); routePoints = []; if(routePolyline) map.removeLayer(routePolyline); routePolyline = null; } 
+      else { btn.innerHTML = '✏️ Disegna percorso'; controls.classList.add('hidden'); }
     }
 
-    function undoLastPoint() {
-      if (routePoints.length > 0) {
-        routePoints.pop();
-        redrawRoutePolyline();
-        updateRouteLength();
-      }
-    }
+    function undoLastPoint() { if(routePoints.length > 0) { routePoints.pop(); redrawRoutePolyline(); updateRouteLength(); } }
+    
+    function clearRoute() { routePoints = []; if(routePolyline) map.removeLayer(routePolyline); routePolyline = null; routeMarkers.forEach(m => map.removeLayer(m)); routeMarkers = []; document.getElementById('routeResults').innerHTML = ''; document.getElementById('routeControls').classList.add('hidden'); toggleDrawing(); }
 
-    function clearRoute() {
-      routePoints = [];
-      if (routePolyline) map.removeLayer(routePolyline);
-      routePolyline = null;
-      routeMarkers.forEach(m => map.removeLayer(m));
-      routeMarkers = [];
-      document.getElementById('routeResults').innerHTML = '';
-      document.getElementById('routeControls').classList.add('hidden');
-      toggleDrawing(); // reset button
-    }
-
-    // Campiona punti ogni X metri (con distanza esatta dal punto di partenza)
     function getSamplePointsWithDist(points, interval) {
       if (points.length < 2) return [];
-      const result = [];
-      let totalDist = 0;
-      result.push({latlng: L.latLng(points[0].lat, points[0].lng), dist: 0});
-
+      const result = []; let totalDist = 0; result.push({latlng: points[0], dist: 0});
       for (let i = 1; i < points.length; i++) {
-        const from = points[i-1];
-        const to = points[i];
-        const segLength = from.distanceTo(to);
-        let localDist = interval;
-
-        while (localDist < segLength) {
-          const frac = localDist / segLength;
-          const latlng = L.latLng(
-            from.lat + frac * (to.lat - from.lat),
-            from.lng + frac * (to.lng - from.lng)
-          );
-          result.push({latlng, dist: totalDist + localDist});
-          localDist += interval;
-        }
+        const from = points[i-1]; const to = points[i]; const segLength = from.distanceTo(to); let localDist = interval;
+        while (localDist < segLength) { const frac = localDist / segLength; const latlng = L.latLng(from.lat + frac*(to.lat-from.lat), from.lng + frac*(to.lng-from.lng)); result.push({latlng, dist: totalDist + localDist}); localDist += interval; }
         totalDist += segLength;
       }
-      result.push({latlng: L.latLng(points[points.length-1].lat, points[points.length-1].lng), dist: totalDist});
+      result.push({latlng: points[points.length-1], dist: totalDist});
       return result;
     }
 
     async function finishAndAnalyze() {
-      if (routePoints.length < 2) {
-        alert("Disegna almeno due punti per creare un percorso!");
-        return;
-      }
+      if (routePoints.length < 2) return alert("Disegna almeno due punti!");
       const interval = parseInt(document.getElementById('interval').value);
       const fuel = document.getElementById('fuel').value;
-      const radius = 5; // raggio fisso per analisi lungo strada (più preciso)
       const samples = getSamplePointsWithDist(routePoints, interval);
-
-      // Pulisci vecchi risultati percorso
-      routeMarkers.forEach(m => map.removeLayer(m));
-      routeMarkers = [];
-      document.getElementById('routeResults').innerHTML = `<p class="text-lime-400">🔄 Analizzando ${samples.length} punti lungo il percorso...</p>`;
-
-      const uniqueStations = new Map();
-
-      for (let sample of samples) {
-        const url = `${API_BASE}/api/distributori?latitude=${sample.latlng.lat}&longitude=${sample.latlng.lng}&distance=${radius}&fuel=${fuel}&results=1`;
-        try {
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data && data.length > 0) {
-            const station = data[0];
-            const key = `${station.gestore || ''}|${station.indirizzo || ''}`.toLowerCase();
-            if (!uniqueStations.has(key)) {
-              uniqueStations.set(key, { ...station, routeDist: sample.dist / 1000 });
-            }
-          }
-        } catch(e) {}
+      routeMarkers.forEach(m => map.removeLayer(m)); routeMarkers = [];
+      document.getElementById('routeResults').innerHTML = `<p class="text-xs text-muted">Analizzando ${samples.length} punti...</p>`;
+      
+      const unique = new Map();
+      for (let s of samples) {
+        const res = await fetch(`${API_BASE}/api/distributori?latitude=${s.latlng.lat}&longitude=${s.latlng.lng}&distance=5&fuel=${fuel}&results=1`);
+        const data = await res.json();
+        if (data.length > 0) {
+          const st = data[0]; const key = `${st.gestore}|${st.indirizzo}`.toLowerCase();
+          if (!unique.has(key)) unique.set(key, { ...st, routeDist: s.dist / 1000 });
+        }
       }
-
-      const sorted = Array.from(uniqueStations.values()).sort((a, b) => a.routeDist - b.routeDist);
-
-      let html = `<h3 class="font-semibold mb-3 text-lime-400">🚩 Migliori distributori lungo il percorso (${sorted.length})</h3>`;
+      const sorted = Array.from(unique.values()).sort((a,b) => a.routeDist - b.routeDist);
+      let html = `<h3 class="text-xs font-semibold text-primary">Migliori lungo percorso</h3>`;
       sorted.forEach(st => {
-        const marker = L.marker([st.latitudine, st.longitudine])
-          .addTo(map)
-          .bindPopup(`<b>${st.gestore}</b><br>${st.indirizzo}<br><span class="text-green-600 font-bold">Al km ${st.routeDist.toFixed(1)} • ${st.prezzo.toFixed(3)} €</span>`);
+        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.prezzo}€`);
         routeMarkers.push(marker);
-
-        html += `
-          <div class="bg-gray-700 rounded-xl p-4 cursor-pointer hover:bg-gray-600" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)">
-            <div class="text-xs text-gray-400 mb-1">Al km ${st.routeDist.toFixed(1)}</div>
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="font-semibold">${st.gestore}</div>
-                <div class="text-sm text-gray-400">${st.indirizzo}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-3xl font-bold text-green-400">${st.prezzo.toFixed(3)}€</div>
-              </div>
-            </div>
-          </div>`;
+        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.prezzo}€ - Km ${st.routeDist.toFixed(1)}</div></div>`;
       });
-
-      document.getElementById('routeResults').innerHTML = html || '<p class="text-gray-400">Nessun distributore trovato lungo il percorso.</p>';
+      document.getElementById('routeResults').innerHTML = html;
     }
 
-    // (tutto il resto delle funzioni cerca(), usaPosizioneAttuale(), searchCity() rimane identico a prima)
     async function cerca(lat = null, lon = null) {
       const fuel = document.getElementById('fuel').value;
-      const distance = document.getElementById('distance').value;
-      const results = document.getElementById('results').value;
-
-      if (!lat || !lon) {
-        if (currentLat && currentLon) { lat = currentLat; lon = currentLon; }
-        else { const c = map.getCenter(); lat = c.lat; lon = c.lng; }
-      }
-
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-
-      const url = `${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${distance}&fuel=${fuel}&results=${results}`;
-      
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-
-        document.getElementById('lista').innerHTML = `<h2 class="text-xl font-semibold mb-4">Risultati (${data.length})</h2>`;
-
-        data.forEach(station => {
-          const marker = L.marker([station.latitudine, station.longitudine])
-            .addTo(map)
-            .bindPopup(`
-              <b>${station.gestore}</b><br>
-              ${station.indirizzo}<br>
-              <span class="text-green-600 font-bold">${station.prezzo.toFixed(3)} €/litro</span><br>
-              ${station.self ? '🟢 Self' : '🔧 Servito'} • ${station.distanza} km
-            `);
-          markers.push(marker);
-
-          const div = document.createElement('div');
-          div.className = "bg-gray-700 rounded-xl p-4 cursor-pointer hover:bg-gray-600";
-          div.innerHTML = `
-            <div class="flex justify-between">
-              <div>
-                <div class="font-semibold">${station.gestore}</div>
-                <div class="text-sm text-gray-400">${station.indirizzo}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-2xl font-bold text-green-400">${station.prezzo.toFixed(3)}€</div>
-                <div class="text-xs text-gray-400">${station.distanza} km</div>
-              </div>
-            </div>
-          `;
-          div.onclick = () => map.flyTo([station.latitudine, station.longitudine], 16);
-          document.getElementById('lista').appendChild(div);
-        });
-
-        if (data.length > 0) map.fitBounds(markers.map(m => m.getLatLng()));
-      } catch(e) {
-        alert("Errore di connessione al server.");
-      }
+      const dist = document.getElementById('distance').value;
+      const resCount = document.getElementById('results').value;
+      if (!lat || !lon) { const c = map.getCenter(); lat = c.lat; lon = c.lng; }
+      markers.forEach(m => map.removeLayer(m)); markers = [];
+      const data = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
+      document.getElementById('lista').innerHTML = `<h2 class="text-sm font-semibold">Risultati</h2>`;
+      data.forEach(st => {
+        const m = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.prezzo}€`);
+        markers.push(m);
+        const div = document.createElement('div');
+        div.className = "bg-background border border-border p-3 rounded-sm hover:border-primary cursor-pointer";
+        div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.prezzo}€ • ${st.distanza}km</div>`;
+        div.onclick = () => map.flyTo([st.latitudine, st.longitudine], 16);
+        document.getElementById('lista').appendChild(div);
+      });
+      if (data.length > 0) map.fitBounds(markers.map(m => m.getLatLng()));
     }
 
     async function usaPosizioneAttuale() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          map.flyTo([lat, lon], 14);
-          if (searchMarker) map.removeLayer(searchMarker);
-          searchMarker = L.marker([lat, lon]).addTo(map).bindPopup('📍 La tua posizione attuale').openPopup();
-          currentLat = lat; currentLon = lon;
-          cerca(lat, lon);
-        }, () => alert("Impossibile ottenere la posizione."));
-      }
+      navigator.geolocation.getCurrentPosition(pos => {
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 14);
+        cerca(pos.coords.latitude, pos.coords.longitude);
+      });
     }
 
     async function searchCity() {
-      const query = document.getElementById('citySearch').value.trim();
-      if (!query) return;
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=it`);
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          map.flyTo([lat, lon], 13);
-          setSearchCenter({ lat, lng: lon });
-          document.getElementById('citySearch').value = data[0].display_name.split(',')[0];
-        } else alert("Città non trovata");
-      } catch(e) { alert("Errore ricerca città"); }
+      const q = document.getElementById('citySearch').value;
+      const data = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`)).json();
+      if (data.length) { map.flyTo([data[0].lat, data[0].lon], 13); cerca(data[0].lat, data[0].lon); }
     }
 
-    
-    document.getElementById('distance').addEventListener('input', function() {
-      document.getElementById('distanceValue').textContent = this.value + ' km';
-    });
-
+    document.getElementById('distance').addEventListener('input', (e) => document.getElementById('distanceValue').textContent = e.target.value + ' km');
     window.onload = initMap;
   </script>
 </body>

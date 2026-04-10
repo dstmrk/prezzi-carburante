@@ -163,56 +163,88 @@
       
       const unique = new Map();
       for (let s of samples) {
-        const res = await fetch(`${API_BASE}/api/distributori?latitude=${s.latlng.lat}&longitude=${s.latlng.lng}&distance=5&fuel=${fuel}&results=1`);
-        const data = await res.json();
-        if (data.length > 0) {
-          const st = data[0]; const key = `${st.gestore}|${st.indirizzo}`.toLowerCase();
-          if (!unique.has(key)) unique.set(key, { ...st, routeDist: s.dist / 1000 });
-        }
+        try {
+          const res = await fetch(`${API_BASE}/api/distributori?latitude=${s.latlng.lat}&longitude=${s.latlng.lng}&distance=5&fuel=${fuel}&results=1`);
+          const data = await res.json();
+          if (data.length > 0) {
+            const st = data[0]; const key = `${st.gestore}|${st.indirizzo}`.toLowerCase();
+            if (!unique.has(key)) unique.set(key, { ...st, routeDist: s.dist / 1000 });
+          }
+        } catch(e) {}
       }
       const sorted = Array.from(unique.values()).sort((a,b) => a.routeDist - b.routeDist);
-      let html = `<h3 class="text-xs font-semibold text-primary">Migliori lungo percorso</h3>`;
+      let html = `<h3 class="text-xs font-semibold text-primary mb-1">Migliori lungo percorso (${sorted.length})</h3>`;
       sorted.forEach(st => {
-        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.prezzo}€`);
+        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.indirizzo}<br><span style="color:#10b981;font-weight:bold">Km ${st.routeDist.toFixed(1)} • ${st.prezzo.toFixed(3)} €</span>`);
         routeMarkers.push(marker);
-        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.prezzo}€ - Km ${st.routeDist.toFixed(1)}</div></div>`;
+        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs text-muted mb-0.5">Al km ${st.routeDist.toFixed(1)}</div><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.indirizzo}</div><div class="text-sm font-bold text-primary mt-1">${st.prezzo.toFixed(3)}€</div></div>`;
       });
-      document.getElementById('routeResults').innerHTML = html;
+      document.getElementById('routeResults').innerHTML = html || '<p class="text-xs text-muted">Nessun distributore trovato lungo il percorso.</p>';
     }
 
     async function cerca(lat = null, lon = null) {
       const fuel = document.getElementById('fuel').value;
       const dist = document.getElementById('distance').value;
       const resCount = document.getElementById('results').value;
-      if (!lat || !lon) { const c = map.getCenter(); lat = c.lat; lon = c.lng; }
+      if (!lat || !lon) {
+        if (currentLat && currentLon) { lat = currentLat; lon = currentLon; }
+        else { const c = map.getCenter(); lat = c.lat; lon = c.lng; }
+      }
       markers.forEach(m => map.removeLayer(m)); markers = [];
-      const data = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
-      document.getElementById('lista').innerHTML = `<h2 class="text-sm font-semibold">Risultati</h2>`;
-      data.forEach(st => {
-        const m = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.prezzo}€`);
-        markers.push(m);
-        const div = document.createElement('div');
-        div.className = "bg-background border border-border p-3 rounded-sm hover:border-primary cursor-pointer";
-        div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.prezzo}€ • ${st.distanza}km</div>`;
-        div.onclick = () => map.flyTo([st.latitudine, st.longitudine], 16);
-        document.getElementById('lista').appendChild(div);
-      });
-      if (data.length > 0) map.fitBounds(markers.map(m => m.getLatLng()));
+      try {
+        const data = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
+        document.getElementById('lista').innerHTML = `<h2 class="text-sm font-semibold">Risultati (${data.length})</h2>`;
+        data.forEach(st => {
+          const m = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`
+            <b>${st.gestore}</b><br>${st.indirizzo}<br>
+            <span style="color:#10b981;font-weight:bold">${st.prezzo.toFixed(3)} €/litro</span><br>
+            ${st.self ? '🟢 Self' : '🔧 Servito'} • ${st.distanza} km
+          `);
+          markers.push(m);
+          const div = document.createElement('div');
+          div.className = "bg-background border border-border p-3 rounded-sm hover:border-primary cursor-pointer";
+          div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.indirizzo}</div><div class="flex justify-between mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-xs text-muted">${st.distanza} km</span></div>`;
+          div.onclick = () => map.flyTo([st.latitudine, st.longitudine], 16);
+          document.getElementById('lista').appendChild(div);
+        });
+        if (data.length > 0) map.fitBounds(markers.map(m => m.getLatLng()));
+      } catch(e) {
+        alert("Errore di connessione al server.");
+      }
     }
 
     async function usaPosizioneAttuale() {
+      if (!navigator.geolocation) { alert("Geolocalizzazione non supportata dal browser."); return; }
       navigator.geolocation.getCurrentPosition(pos => {
-        map.flyTo([pos.coords.latitude, pos.coords.longitude], 14);
-        cerca(pos.coords.latitude, pos.coords.longitude);
-      });
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        map.flyTo([lat, lon], 14);
+        if (searchMarker) map.removeLayer(searchMarker);
+        searchMarker = L.marker([lat, lon]).addTo(map).bindPopup('📍 La tua posizione attuale').openPopup();
+        currentLat = lat; currentLon = lon;
+        cerca(lat, lon);
+      }, () => alert("Impossibile ottenere la posizione."));
     }
 
     async function searchCity() {
-      const q = document.getElementById('citySearch').value;
-      const data = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`)).json();
-      if (data.length) { map.flyTo([data[0].lat, data[0].lon], 13); cerca(data[0].lat, data[0].lon); }
+      const query = document.getElementById('citySearch').value.trim();
+      if (!query) return;
+      try {
+        const data = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=it`)).json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          map.flyTo([lat, lon], 13);
+          setSearchCenter({ lat, lng: lon });
+          document.getElementById('citySearch').value = data[0].display_name.split(',')[0];
+        } else { alert("Città non trovata"); }
+      } catch(e) { alert("Errore ricerca città"); }
     }
     
+    document.getElementById('distance').addEventListener('input', function() {
+      document.getElementById('distanceValue').textContent = this.value + ' km';
+    });
+
     window.onload = initMap;
   </script>
 </body>

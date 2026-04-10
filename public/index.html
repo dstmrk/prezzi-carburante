@@ -19,7 +19,7 @@
             background: '#09090b',
             card: '#18181b',
             border: '#27272a',
-            primary: '#10b981',
+            primary: '#10b981', // Emerald
             muted: '#a1a1aa'
           }
         }
@@ -29,7 +29,7 @@
   <style>
     body { font-family: 'Inter', sans-serif; }
     #map { height: 100vh; }
-    .leaflet-popup-content { color: #000; font-size: 14px; }
+    .leaflet-popup-content { color: #000; font-size: 14px; line-height: 1.5; }
   </style>
 </head>
 <body class="bg-background text-white">
@@ -44,64 +44,49 @@
       <div class="mb-6 space-y-2">
         <label class="text-xs font-medium text-muted">Cerca città o indirizzo</label>
         <div class="flex gap-2">
-          <input id="citySearch" type="text" placeholder="Es: Roma" 
+          <input id="citySearch" type="text" placeholder="Roma, Milano..." 
                  class="flex-1 bg-background border border-border rounded-sm p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
                  onkeydown="if(event.key === 'Enter') searchCity()">
           <button onclick="searchCity()" class="bg-border hover:bg-zinc-700 px-4 rounded-sm">🔎</button>
         </div>
       </div>
 
+      <!-- Sezione PERCORSO (Invariata) -->
       <div class="border-t border-border pt-6 mt-6">
         <h2 class="text-sm font-semibold mb-3 text-primary">🛣️ Analisi Percorso</h2>
         <button onclick="toggleDrawing()" id="drawBtn" class="w-full bg-primary text-black font-semibold py-2 rounded-sm text-sm hover:bg-emerald-600">
           ✏️ Disegna percorso
         </button>
-
         <div id="routeControls" class="hidden space-y-4 mt-4 bg-background p-4 rounded-sm border border-border">
-          <div class="flex justify-between text-sm">
-            <span>Lunghezza:</span>
-            <span id="routeLength" class="font-medium text-primary">0.0 km</span>
-          </div>
+          <div class="flex justify-between text-sm"><span>Lunghezza:</span><span id="routeLength" class="font-medium text-primary">0.0 km</span></div>
           <div class="flex gap-2">
             <button onclick="undoLastPoint()" class="flex-1 bg-border hover:bg-zinc-700 py-1 rounded-sm text-xs">Annulla</button>
-            <button onclick="clearRoute()" class="flex-1 bg-red-900/50 hover:bg-red-900 py-1 rounded-sm text-xs text-red-200">Cancella</button>
+            <button onclick="clearRoute()" class="flex-1 bg-red-900/50 text-red-200 py-1 rounded-sm text-xs">Cancella</button>
           </div>
           <select id="interval" class="w-full bg-card border border-border rounded-sm p-2 text-sm">
-            <option value="500">500 metri</option>
-            <option value="1000" selected>1 km</option>
+            <option value="500">500 metri</option><option value="1000" selected>1 km</option>
           </select>
-          <button onclick="finishAndAnalyze()" class="w-full bg-primary text-black font-semibold py-2 rounded-sm text-sm hover:bg-emerald-600">
-            ✅ Analizza percorso
-          </button>
+          <button onclick="finishAndAnalyze()" class="w-full bg-primary text-black font-semibold py-2 rounded-sm text-sm hover:bg-emerald-600">✅ Analizza</button>
         </div>
         <div id="routeResults" class="mt-4 space-y-2"></div>
       </div>
 
+      <!-- Controlli -->
       <div class="space-y-4 mt-8 pt-6 border-t border-border">
         <div>
           <label class="text-xs text-muted block mb-1">Carburante</label>
           <select id="fuel" class="w-full bg-background border border-border rounded-sm p-2 text-sm outline-none">
-            <option value="benzina">Benzina</option>
-            <option value="gasolio">Gasolio</option>
-            <option value="gpl">GPL</option>
-            <option value="metano">Metano</option>
+            <option value="benzina">Benzina</option><option value="gasolio" selected>Gasolio</option><option value="gpl">GPL</option><option value="metano">Metano</option>
           </select>
         </div>
-        
         <div>
-          <label class="text-xs text-muted block mb-1">Raggio (km): <span id="distanceValue">5 km</span></label>
-          <input type="range" id="distance" min="1" max="25" value="5" class="w-full accent-primary">
+          <label class="text-xs text-muted block mb-1">Raggio (km): <span id="distanceValue">15 km</span></label>
+          <input type="range" id="distance" min="5" max="50" value="15" class="w-full accent-primary">
         </div>
-        
-        <!-- Re-introdotto il campo mancante per il numero di risultati -->
-        <input type="hidden" id="results" value="15">
+        <input type="number" id="results" value="15" class="hidden">
 
-        <button onclick="cerca()" class="w-full bg-primary text-black font-semibold py-3 rounded-sm hover:bg-emerald-600 transition">
-          🔎 Cerca distributori
-        </button>
-        <button onclick="usaPosizioneAttuale()" class="w-full border border-border hover:bg-border py-2 rounded-sm text-sm">
-          📍 Posizione attuale
-        </button>
+        <button onclick="cerca()" class="w-full bg-primary text-black font-bold py-3 rounded-sm hover:bg-emerald-600 text-lg">🔎 Cerca</button>
+        <button onclick="usaPosizioneAttuale()" class="w-full border border-border hover:bg-border py-2 rounded-sm text-sm">📍 Posizione attuale</button>
       </div>
 
       <div id="lista" class="mt-8 space-y-3"></div>
@@ -113,22 +98,18 @@
   <script>
     let map, markers = [], searchMarker = null, currentLat = null, currentLon = null;
     let routePoints = [], routePolyline = null, routeMarkers = [], isDrawing = false;
-    const API_BASE = '';
+    const API_BASE = ''; // Lascia vuoto per Render
 
     function initMap() {
       map = L.map('map').setView([41.9028, 12.4964], 6);
-      // Mappa chiara standard
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
-
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
       map.on('click', (e) => {
         if (isDrawing) { routePoints.push(e.latlng); redrawRoutePolyline(); updateRouteLength(); }
         else setSearchCenter(e.latlng);
       });
     }
 
-    // --- FUNZIONI ORIGINALI INSERITE ---
+ // --- FUNZIONI ORIGINALI INSERITE ---
     function setSearchCenter(latlng) {
       if (searchMarker) map.removeLayer(searchMarker);
       searchMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup('📍 Centro').openPopup();
@@ -231,8 +212,7 @@
       const data = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`)).json();
       if (data.length) { map.flyTo([data[0].lat, data[0].lon], 13); cerca(data[0].lat, data[0].lon); }
     }
-
-    document.getElementById('distance').addEventListener('input', (e) => document.getElementById('distanceValue').textContent = e.target.value + ' km');
+    
     window.onload = initMap;
   </script>
 </body>

@@ -239,7 +239,6 @@
           const lon = parseFloat(data[0].lon);
           map.flyTo([lat, lon], 13);
           setSearchCenter({ lat, lng: lon });
-          document.getElementById('citySearch').value = data[0].display_name.split(',')[0];
         } else { alert("Città non trovata"); }
       } catch(e) { alert("Errore ricerca città"); }
     }

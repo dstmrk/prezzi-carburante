@@ -83,7 +83,10 @@
           <label class="text-xs text-muted block mb-1">Raggio (km): <span id="distanceValue">5 km</span></label>
           <input type="range" id="distance" min="1" max="25" value="5" class="w-full accent-primary">
         </div>
-        <input type="number" id="results" value="15" class="hidden">
+        <div>
+          <label class="text-xs text-muted block mb-1">Numero di risultati</label>
+          <input type="number" id="results" value="15" min="5" max="50" class="w-full bg-background border border-border rounded-sm p-2 text-sm outline-none">
+        </div>
 
         <button onclick="cerca()" class="w-full bg-primary text-black font-bold py-3 rounded-sm hover:bg-emerald-600 text-lg">🔎 Cerca</button>
         <button onclick="usaPosizioneAttuale()" class="w-full border border-border hover:bg-border py-2 rounded-sm text-sm">📍 Posizione attuale</button>

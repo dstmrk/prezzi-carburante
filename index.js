@@ -7,10 +7,14 @@ const Papa = require('papaparse');
 const app = express();
 const cors = require('cors');
 
-app.use(cors());                    // permette tutte le richieste locali
-app.use(express.static(__dirname)); // serve automaticamente index.html
-
 const PORT = process.env.PORT || 8888;
+
+app.use(cors());                    // permette tutte le richieste locali
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const jsonDataFile = path.join(__dirname, 'data.json'); // Usa un percorso assoluto
 
 function degToRad(deg) {

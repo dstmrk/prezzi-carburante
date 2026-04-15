@@ -17,6 +17,9 @@ app.get('/', (req, res) => {
 
 const jsonDataFile = path.join(__dirname, 'data.json'); // Usa un percorso assoluto
 
+let cachedData = null;   // cache in memoria dei dati parsed
+let fetchPromise = null; // singleton per evitare fetch concorrenti
+
 function degToRad(deg) {
   return deg * (Math.PI / 180);
 }
@@ -162,16 +165,30 @@ function buildDataDictionary(anagraficaRecords, prezziRecords) {
   return dataDictionary;
 }
 
+async function axiosGetWithRetry(url, config, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await axios.get(url, config);
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
+      const delay = 2000 * attempt;
+      console.warn(`Retry ${attempt}/${maxRetries} for ${url} after ${delay}ms: ${err.message}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 async function fetchAndCombineCSVData() {
   console.log('Fetching and combining CSV data...');
   try {
     const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
     const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
 
-    // Scarica i file in parallelo
+    // Scarica i file in parallelo con timeout e retry
+    const axiosConfig = { responseType: 'arraybuffer', timeout: 30000 };
     const [anagraficaResponse, prezziResponse] = await Promise.all([
-      axios.get(csvAnagraficaUrl, { responseType: 'arraybuffer' }), // Aggiunto per gestire encoding
-      axios.get(csvPrezziUrl, { responseType: 'arraybuffer' })      // Aggiunto per gestire encoding
+      axiosGetWithRetry(csvAnagraficaUrl, axiosConfig),
+      axiosGetWithRetry(csvPrezziUrl, axiosConfig)
     ]);
 
     // Decodifica i dati gestendo l'encoding ISO-8859-1 (comune nei file ministeriali)
@@ -193,7 +210,8 @@ async function fetchAndCombineCSVData() {
     ]);
     const dataDictionary = buildDataDictionary(anagraficaRecords, prezziRecords);
 
-    await fs.writeFile(jsonDataFile, JSON.stringify(dataDictionary, null, 2));
+    await fs.writeFile(jsonDataFile, JSON.stringify(dataDictionary));
+    cachedData = dataDictionary;
     console.log('Updated data stored successfully in JSON file.');
   } catch (error) {
     console.error(`Error fetching or processing CSV data: ${error.message}`);
@@ -217,34 +235,29 @@ async function readJSONData() {
 function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel, maxItems) {
     const stations = Object.values(jsonData);
 
-    const validStations = stations.filter(station => {
+    const validStations = [];
+    for (const station of stations) {
         const stationFuel = station.prezzi[fuel];
-        if (!stationFuel || !isRecent(stringToDate(stationFuel.data))) {
-            return false;
-        }
+        if (!stationFuel || !isRecent(stringToDate(stationFuel.data))) continue;
 
         const distance = calculateDistance(latitude, longitude, station.latitudine, station.longitudine);
-        if (distance > distanceLimit) {
-            return false;
-        }
+        if (distance > distanceLimit) continue;
 
-        // Aggiunge la distanza all'oggetto per non ricalcolarla
-        station.distanza = distance;
-        return true;
-    });
+        validStations.push({ station, distance });
+    }
 
     // Ordina per prezzo crescente
-    validStations.sort((a, b) => a.prezzi[fuel].prezzo - b.prezzi[fuel].prezzo);
+    validStations.sort((a, b) => a.station.prezzi[fuel].prezzo - b.station.prezzi[fuel].prezzo);
 
     // Restituisce i risultati aggiungendo il campo "posizione"
-    return validStations.slice(0, maxItems).map((s, index) => ({
-        ranking: index + 1, // <-- ECCO LA NUOVA INFORMAZIONE
+    return validStations.slice(0, maxItems).map(({ station: s, distance }, index) => ({
+        ranking: index + 1,
         gestore: s.gestore,
         indirizzo: s.indirizzo,
         prezzo: s.prezzi[fuel].prezzo,
         self: s.prezzi[fuel].self,
         data: s.prezzi[fuel].data,
-        distanza: s.distanza.toFixed(2), // Formattiamo qui la distanza
+        distanza: distance.toFixed(2),
         latitudine: s.latitudine,
         longitudine: s.longitudine
     }));
@@ -267,6 +280,27 @@ async function isFileUpdatedWithin(filePath, hours) {
   }
 }
 
+// Restituisce i dati dalla cache in memoria, o li carica dal disco se non disponibili
+async function getData() {
+  if (cachedData) return cachedData;
+  const data = await readJSONData();
+  cachedData = data;
+  return data;
+}
+
+// Garantisce che i dati siano aggiornati, evitando fetch concorrenti (singleton)
+async function ensureDataFresh() {
+  const isUpToDate = await isFileUpdatedWithin(jsonDataFile, 24);
+  if (isUpToDate && cachedData) return;
+
+  if (!fetchPromise) {
+    fetchPromise = fetchAndCombineCSVData().finally(() => {
+      fetchPromise = null;
+    });
+  }
+  await fetchPromise;
+}
+
 app.get('/api/distributori', async (req, res) => {
   try {
     const { latitude, longitude, distance, fuel, results } = req.query;
@@ -279,14 +313,9 @@ app.get('/api/distributori', async (req, res) => {
       return res.status(400).json({ error: 'Invalid latitude, longitude, distance or fuel values.' });
     }
 
-    // Controlla e aggiorna il file JSON se necessario
-    const isUpToDate = await isFileUpdatedWithin(jsonDataFile, 24);
-    if (!isUpToDate) {
-      console.log("Updating json file as it's old or missing.");
-      await fetchAndCombineCSVData();
-    }
+    await ensureDataFresh();
 
-    const data = await readJSONData();
+    const data = await getData();
     if (!data) {
         return res.status(500).json({ error: 'Could not load fuel station data.' });
     }
@@ -308,11 +337,11 @@ app.get('/api/prezzo', async (req, res) => {
       return res.status(400).json({ error: 'stationID and fuel are required.' });
     }
 
-    const data = await readJSONData();
+    const data = await getData();
     if (!data) {
       return res.status(500).json({ error: 'Could not load fuel station data.' });
     }
-    
+
     const station = data[stationID];
     if (!station) {
       return res.status(404).json({ error: 'Station not found.' });
@@ -340,11 +369,7 @@ app.get('/api/prezzo', async (req, res) => {
 function startServer() {
   return app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
-    isFileUpdatedWithin(jsonDataFile, 24).then(isUpToDate => {
-      if (!isUpToDate) {
-        fetchAndCombineCSVData();
-      }
-    });
+    ensureDataFresh();
   });
 }
 
@@ -357,8 +382,10 @@ module.exports = {
   buildDataDictionary,
   calculateDistance,
   calculateTopStations,
+  ensureDataFresh,
   fetchAndCombineCSVData,
   findHeaderRowIndex,
+  getData,
   isFileUpdatedWithin,
   isRecent,
   normalizeHeader,

@@ -170,16 +170,18 @@
       routeMarkers.forEach(m => map.removeLayer(m)); routeMarkers = [];
       document.getElementById('routeResults').innerHTML = `<p class="text-xs text-muted">Analizzando ${samples.length} punti...</p>`;
       
+      const responses = await Promise.all(samples.map(s =>
+        fetch(`${API_BASE}/api/distributori?latitude=${s.latlng.lat}&longitude=${s.latlng.lng}&distance=5&fuel=${fuel}&results=1`)
+          .then(r => r.ok ? r.json() : [])
+          .then(data => ({ data, dist: s.dist }))
+          .catch(() => ({ data: [], dist: s.dist }))
+      ));
       const unique = new Map();
-      for (let s of samples) {
-        try {
-          const res = await fetch(`${API_BASE}/api/distributori?latitude=${s.latlng.lat}&longitude=${s.latlng.lng}&distance=5&fuel=${fuel}&results=1`);
-          const data = await res.json();
-          if (data.length > 0) {
-            const st = data[0]; const key = `${st.gestore}|${st.indirizzo}`.toLowerCase();
-            if (!unique.has(key)) unique.set(key, { ...st, routeDist: s.dist / 1000 });
-          }
-        } catch(e) {}
+      for (const { data, dist } of responses) {
+        if (data.length === 0) continue;
+        const st = data[0];
+        const key = `${st.gestore}|${st.indirizzo}`.toLowerCase();
+        if (!unique.has(key)) unique.set(key, { ...st, routeDist: dist / 1000 });
       }
       const sorted = Array.from(unique.values()).sort((a,b) => a.routeDist - b.routeDist);
       let html = `<h3 class="text-xs font-semibold text-primary mb-1">Migliori lungo percorso (${sorted.length})</h3>`;

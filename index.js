@@ -1,31 +1,34 @@
 const express = require('express');
 const axios = require('axios');
-const fs = require('fs/promises');
 const path = require('path');
 const Papa = require('papaparse');
-
-const app = express();
+const compression = require('compression');
 const cors = require('cors');
 
-const PORT = process.env.PORT || 8888;
+const app = express();
 
-app.use(cors());                    // permette tutte le richieste locali
+const PORT = process.env.PORT || 8888;
+const DATA_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_DISTANCE_KM = 50;
+const MAX_RESULTS = 50;
+
+app.use(compression());
+app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-const jsonDataFile = path.join(__dirname, 'data.json'); // Usa un percorso assoluto
-
-let cachedData = null;   // cache in memoria dei dati parsed
-let fetchPromise = null; // singleton per evitare fetch concorrenti
+let cachedData = null;
+let lastFetchAt = 0;
+let fetchPromise = null;
 
 function degToRad(deg) {
   return deg * (Math.PI / 180);
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Raggio della Terra in km
+  const R = 6371;
   const dLat = degToRad(lat2 - lat1);
   const dLon = degToRad(lon2 - lon1);
   const a =
@@ -116,7 +119,7 @@ function parseNumericValue(value) {
 }
 
 function buildDataDictionary(anagraficaRecords, prezziRecords) {
-  const dataDictionary = {};
+  const dataDictionary = Object.create(null);
 
   for (const record of anagraficaRecords) {
     const idImpianto = getField(record, ['idimpianto']);
@@ -139,25 +142,28 @@ function buildDataDictionary(anagraficaRecords, prezziRecords) {
       indirizzo,
       latitudine,
       longitudine,
-      prezzi: {}
+      prezzi: Object.create(null)
     };
   }
 
   for (const record of prezziRecords) {
     const idImpianto = getField(record, ['idimpianto']);
+    const station = dataDictionary[idImpianto];
+    if (!station) continue;
+
     const fuelType = getField(record, ['desccarburante']).toLowerCase();
     const price = parseNumericValue(getField(record, ['prezzo']));
+    if (!fuelType || isNaN(price)) continue;
 
-    if (!dataDictionary[idImpianto] || !fuelType || isNaN(price)) {
-      continue;
-    }
+    const dataRaw = getField(record, ['dtcomu']);
+    if (!isRecent(stringToDate(dataRaw))) continue;
 
-    const existingPrice = dataDictionary[idImpianto].prezzi[fuelType]?.prezzo;
-    if (!existingPrice || price < existingPrice) {
-      dataDictionary[idImpianto].prezzi[fuelType] = {
+    const existing = station.prezzi[fuelType];
+    if (!existing || price < existing.prezzo) {
+      station.prezzi[fuelType] = {
         prezzo: price,
         self: getField(record, ['isself']) === '1',
-        data: getField(record, ['dtcomu'])
+        data: dataRaw
       };
     }
   }
@@ -180,125 +186,100 @@ async function axiosGetWithRetry(url, config, maxRetries = 3) {
 
 async function fetchAndCombineCSVData() {
   console.log('Fetching and combining CSV data...');
-  try {
-    const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
-    const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
+  const csvAnagraficaUrl = 'https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
+  const csvPrezziUrl = 'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
 
-    // Scarica i file in parallelo con timeout e retry
-    const axiosConfig = { responseType: 'arraybuffer', timeout: 30000 };
-    const [anagraficaResponse, prezziResponse] = await Promise.all([
-      axiosGetWithRetry(csvAnagraficaUrl, axiosConfig),
-      axiosGetWithRetry(csvPrezziUrl, axiosConfig)
-    ]);
+  const axiosConfig = { responseType: 'arraybuffer', timeout: 30000 };
+  const [anagraficaResponse, prezziResponse] = await Promise.all([
+    axiosGetWithRetry(csvAnagraficaUrl, axiosConfig),
+    axiosGetWithRetry(csvPrezziUrl, axiosConfig)
+  ]);
 
-    // Decodifica i dati gestendo l'encoding ISO-8859-1 (comune nei file ministeriali)
-    const anagraficaCsvString = new TextDecoder('iso-8859-1').decode(anagraficaResponse.data);
-    const prezziCsvString = new TextDecoder('iso-8859-1').decode(prezziResponse.data);
+  const decoder = new TextDecoder('iso-8859-1');
+  const anagraficaRecords = parseCsvTable(decoder.decode(anagraficaResponse.data), [
+    'idImpianto',
+    'Indirizzo',
+    'Latitudine',
+    'Longitudine'
+  ]);
+  const prezziRecords = parseCsvTable(decoder.decode(prezziResponse.data), [
+    'idImpianto',
+    'descCarburante',
+    'prezzo',
+    'isSelf',
+    'dtComu'
+  ]);
 
-    const anagraficaRecords = parseCsvTable(anagraficaCsvString, [
-      'idImpianto',
-      'Indirizzo',
-      'Latitudine',
-      'Longitudine'
-    ]);
-    const prezziRecords = parseCsvTable(prezziCsvString, [
-      'idImpianto',
-      'descCarburante',
-      'prezzo',
-      'isSelf',
-      'dtComu'
-    ]);
-    const dataDictionary = buildDataDictionary(anagraficaRecords, prezziRecords);
-
-    await fs.writeFile(jsonDataFile, JSON.stringify(dataDictionary));
-    cachedData = dataDictionary;
-    console.log('Updated data stored successfully in JSON file.');
-  } catch (error) {
-    console.error(`Error fetching or processing CSV data: ${error.message}`);
-    // Aggiungo uno stack trace per un debug più facile
-    console.error(error.stack);
-  }
+  cachedData = buildDataDictionary(anagraficaRecords, prezziRecords);
+  lastFetchAt = Date.now();
+  console.log('Data refresh complete.');
 }
 
-// Funzione per leggere i dati JSON (rifattorizzata)
-async function readJSONData() {
-  try {
-    const jsonData = await fs.readFile(jsonDataFile, 'utf8');
-    return JSON.parse(jsonData);
-  } catch (error) {
-    console.error(`Error reading or parsing JSON data: ${error.message}`);
-    return null;
-  }
-}
-
-// Funzione per calcolare le stazioni migliori (rifattorizzata e con aggiunta della posizione)
-function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel, maxItems) {
-    const stations = Object.values(jsonData);
-
-    const validStations = [];
-    for (const station of stations) {
-        const stationFuel = station.prezzi[fuel];
-        if (!stationFuel || !isRecent(stringToDate(stationFuel.data))) continue;
-
-        const distance = calculateDistance(latitude, longitude, station.latitudine, station.longitudine);
-        if (distance > distanceLimit) continue;
-
-        validStations.push({ station, distance });
-    }
-
-    // Ordina per prezzo crescente
-    validStations.sort((a, b) => a.station.prezzi[fuel].prezzo - b.station.prezzi[fuel].prezzo);
-
-    // Restituisce i risultati aggiungendo il campo "posizione"
-    return validStations.slice(0, maxItems).map(({ station: s, distance }, index) => ({
-        ranking: index + 1,
-        gestore: s.gestore,
-        indirizzo: s.indirizzo,
-        prezzo: s.prezzi[fuel].prezzo,
-        self: s.prezzi[fuel].self,
-        data: s.prezzi[fuel].data,
-        distanza: distance.toFixed(2),
-        latitudine: s.latitudine,
-        longitudine: s.longitudine
-    }));
-}
-
-// Funzione per verificare se il file è stato aggiornato di recente (rifattorizzata)
-async function isFileUpdatedWithin(filePath, hours) {
-  try {
-    const stats = await fs.stat(filePath);
-    const timeDifference = Date.now() - stats.mtime.getTime();
-    const hoursDifference = timeDifference / (1000 * 60 * 60);
-    return hoursDifference < hours;
-  } catch (error) {
-    // Se il file non esiste, ritorna false
-    if (error.code === 'ENOENT') {
-      return false;
-    }
-    console.error(`Error checking file status: ${error.message}`);
-    return false;
-  }
-}
-
-// Restituisce i dati dalla cache in memoria, o li carica dal disco se non disponibili
 async function getData() {
-  if (cachedData) return cachedData;
-  const data = await readJSONData();
-  cachedData = data;
-  return data;
+  return cachedData;
 }
 
-// Garantisce che i dati siano aggiornati, evitando fetch concorrenti (singleton)
 async function ensureDataFresh() {
-  const isUpToDate = await isFileUpdatedWithin(jsonDataFile, 24);
-  if (isUpToDate && cachedData) return;
+  if (cachedData && Date.now() - lastFetchAt < DATA_TTL_MS) return;
 
   if (!fetchPromise) {
-    fetchPromise = fetchAndCombineCSVData().finally(() => {
-      fetchPromise = null;
-    });
+    fetchPromise = fetchAndCombineCSVData()
+      .catch((error) => {
+        console.error(`Error fetching CSV data: ${error.message}`);
+        if (error.stack) console.error(error.stack);
+      })
+      .finally(() => {
+        fetchPromise = null;
+      });
   }
   await fetchPromise;
+}
+
+function calculateTopStations(jsonData, latitude, longitude, distanceLimit, fuel, maxItems) {
+  const latDelta = distanceLimit / 111;
+  const cosLat = Math.cos(degToRad(latitude));
+  const lonDelta = distanceLimit / (111 * Math.max(cosLat, 0.01));
+  const minLat = latitude - latDelta;
+  const maxLat = latitude + latDelta;
+  const minLon = longitude - lonDelta;
+  const maxLon = longitude + lonDelta;
+
+  const validStations = [];
+  for (const id in jsonData) {
+    const station = jsonData[id];
+    if (
+      station.latitudine < minLat ||
+      station.latitudine > maxLat ||
+      station.longitudine < minLon ||
+      station.longitudine > maxLon
+    ) continue;
+
+    const stationFuel = station.prezzi[fuel];
+    if (!stationFuel) continue;
+
+    const distance = calculateDistance(latitude, longitude, station.latitudine, station.longitudine);
+    if (distance > distanceLimit) continue;
+
+    validStations.push({ station, distance });
+  }
+
+  validStations.sort((a, b) => a.station.prezzi[fuel].prezzo - b.station.prezzi[fuel].prezzo);
+
+  return validStations.slice(0, maxItems).map(({ station: s, distance }, index) => ({
+    ranking: index + 1,
+    gestore: s.gestore,
+    indirizzo: s.indirizzo,
+    prezzo: s.prezzi[fuel].prezzo,
+    self: s.prezzi[fuel].self,
+    data: s.prezzi[fuel].data,
+    distanza: distance.toFixed(2),
+    latitudine: s.latitudine,
+    longitudine: s.longitudine
+  }));
+}
+
+function setApiCacheHeaders(res) {
+  res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
 }
 
 app.get('/api/distributori', async (req, res) => {
@@ -306,21 +287,25 @@ app.get('/api/distributori', async (req, res) => {
     const { latitude, longitude, distance, fuel, results } = req.query;
     const lat = parseFloat(latitude);
     const lon = parseFloat(longitude);
-    const distLimit = parseInt(distance, 10);
-    const maxItems = parseInt(results, 10) || 5;
+    const distLimitRaw = parseFloat(distance);
+    const maxItemsRaw = parseInt(results, 10);
 
-    if (isNaN(lat) || isNaN(lon) || isNaN(distLimit) || !fuel) {
+    if (isNaN(lat) || isNaN(lon) || isNaN(distLimitRaw) || distLimitRaw <= 0 || !fuel) {
       return res.status(400).json({ error: 'Invalid latitude, longitude, distance or fuel values.' });
     }
+
+    const distLimit = Math.min(distLimitRaw, MAX_DISTANCE_KM);
+    const maxItems = Math.min(Math.max(maxItemsRaw || 5, 1), MAX_RESULTS);
 
     await ensureDataFresh();
 
     const data = await getData();
     if (!data) {
-        return res.status(500).json({ error: 'Could not load fuel station data.' });
+      return res.status(503).json({ error: 'Fuel station data not yet available, try again shortly.' });
     }
 
     const topStations = calculateTopStations(data, lat, lon, distLimit, fuel.toLowerCase(), maxItems);
+    setApiCacheHeaders(res);
     res.status(200).json(topStations);
 
   } catch (error) {
@@ -337,12 +322,14 @@ app.get('/api/prezzo', async (req, res) => {
       return res.status(400).json({ error: 'stationID and fuel are required.' });
     }
 
+    await ensureDataFresh();
+
     const data = await getData();
     if (!data) {
-      return res.status(500).json({ error: 'Could not load fuel station data.' });
+      return res.status(503).json({ error: 'Fuel station data not yet available, try again shortly.' });
     }
 
-    const station = data[stationID];
+    const station = Object.prototype.hasOwnProperty.call(data, stationID) ? data[stationID] : null;
     if (!station) {
       return res.status(404).json({ error: 'Station not found.' });
     }
@@ -350,7 +337,7 @@ app.get('/api/prezzo', async (req, res) => {
     if (!fuelData) {
       return res.status(404).json({ error: 'Fuel type not found for this station.' });
     }
-    
+
     const price = {
       gestore: station.gestore,
       indirizzo: station.indirizzo,
@@ -359,7 +346,8 @@ app.get('/api/prezzo', async (req, res) => {
       data: fuelData.data
     };
 
-    res.status(200).send(output === 'text' ? String(price.prezzo).replace(".", ",") : price);
+    setApiCacheHeaders(res);
+    res.status(200).send(output === 'text' ? String(price.prezzo).replace('.', ',') : price);
   } catch (error) {
     console.error('Error in /api/prezzo:', error);
     res.status(500).json({ error: 'Internal server error.' });
@@ -386,12 +374,10 @@ module.exports = {
   fetchAndCombineCSVData,
   findHeaderRowIndex,
   getData,
-  isFileUpdatedWithin,
   isRecent,
   normalizeHeader,
   parseCsvRows,
   parseCsvTable,
-  readJSONData,
   startServer,
   stringToDate
 };

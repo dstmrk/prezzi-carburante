@@ -219,12 +219,12 @@
     }
 
  // --- FUNZIONI ORIGINALI INSERITE ---
-    function setSearchCenter(latlng) {
+    function setSearchCenter(latlng, label) {
       currentLat = latlng.lat; currentLon = latlng.lng;
       clearSearchResult();
       if (!map) return;
       if (searchMarker) map.removeLayer(searchMarker);
-      searchMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup('📍 Centro').openPopup();
+      searchMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup(label || '📍 Centro').openPopup();
       searchMarker.on('dragend', () => { const pos = searchMarker.getLatLng(); currentLat = pos.lat; currentLon = pos.lng; });
     }
 
@@ -391,9 +391,10 @@
         if (data && data.length > 0) {
           const lat = parseFloat(data[0].lat);
           const lon = parseFloat(data[0].lon);
+          const label = '📍 ' + formatNominatimAddress(data[0]);
           if (map) map.flyTo([lat, lon], 13);
-          setSearchCenter({ lat, lng: lon });
-          showSearchResult('📍 ' + formatNominatimAddress(data[0]), 'info');
+          setSearchCenter({ lat, lng: lon }, label);
+          showSearchResult(label, 'info');
         } else {
           showSearchResult('⚠️ Indirizzo non trovato. Prova a essere più specifico (via, civico, città).', 'warn');
         }

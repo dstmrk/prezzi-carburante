@@ -174,7 +174,12 @@
       return { text, relative, tooltip, cardClass: 'text-muted', popupColor: '#6b7280' };
     }
 
+    function isDesktopLayout() {
+      return window.matchMedia('(min-width: 768px)').matches;
+    }
+
     function initMap() {
+      if (!isDesktopLayout()) return; // mappa solo da desktop
       map = L.map('map').setView([41.9028, 12.4964], 6);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
       map.on('click', (e) => {
@@ -183,12 +188,30 @@
       });
     }
 
+    // Apre l'app/sito di mappe esterno per le coordinate fornite
+    function openExternalMap(lat, lon, label) {
+      const ua = navigator.userAgent || '';
+      const isAndroid = /android/i.test(ua);
+      const labelEnc = encodeURIComponent(label || '');
+      let url;
+      if (isAndroid) {
+        // geo: rispetta l'app default scelta dall'utente (Google Maps, Waze, ecc.)
+        url = `geo:${lat},${lon}?q=${lat},${lon}(${labelEnc})`;
+      } else {
+        // iOS: i universal link di Google Maps aprono l'app se installata,
+        // altrimenti la web app. Desktop: web Google Maps.
+        url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+      }
+      window.open(url, '_blank', 'noopener');
+    }
+
  // --- FUNZIONI ORIGINALI INSERITE ---
     function setSearchCenter(latlng) {
+      currentLat = latlng.lat; currentLon = latlng.lng;
+      if (!map) return;
       if (searchMarker) map.removeLayer(searchMarker);
       searchMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup('📍 Centro').openPopup();
       searchMarker.on('dragend', () => { const pos = searchMarker.getLatLng(); currentLat = pos.lat; currentLon = pos.lng; });
-      currentLat = latlng.lat; currentLon = latlng.lng;
     }
 
     function redrawRoutePolyline() {
@@ -268,9 +291,10 @@
       const resCount = document.getElementById('results').value;
       if (!lat || !lon) {
         if (currentLat && currentLon) { lat = currentLat; lon = currentLon; }
-        else { const c = map.getCenter(); lat = c.lat; lon = c.lng; }
+        else if (map) { const c = map.getCenter(); lat = c.lat; lon = c.lng; }
+        else { alert("Cerca prima una città o usa la posizione attuale."); return; }
       }
-      markers.forEach(m => map.removeLayer(m)); markers = [];
+      if (map) { markers.forEach(m => map.removeLayer(m)); markers = []; }
       try {
         const raw = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
         const data = filterByMaxAge(raw, getMaxAgeDays());
@@ -278,20 +302,25 @@
         data.forEach(st => {
           const dateInfo = getDateDisplay(st.data);
           const relSuffix = dateInfo.relative ? ` · ${dateInfo.relative}` : '';
-          const m = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`
-            <b>${st.gestore}</b><br>${st.indirizzo}<br>
-            <span style="color:#10b981;font-weight:bold">${st.prezzo.toFixed(3)} €/litro</span><br>
-            ${st.self ? '🟢 Self' : '🔧 Servito'} • ${st.distanza} km<br>
-            <span style="color:${dateInfo.popupColor}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">Aggiornato: ${dateInfo.text}${relSuffix}</span>
-          `);
-          markers.push(m);
+          if (map) {
+            const m = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`
+              <b>${st.gestore}</b><br>${st.indirizzo}<br>
+              <span style="color:#10b981;font-weight:bold">${st.prezzo.toFixed(3)} €/litro</span><br>
+              ${st.self ? '🟢 Self' : '🔧 Servito'} • ${st.distanza} km<br>
+              <span style="color:${dateInfo.popupColor}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">Aggiornato: ${dateInfo.text}${relSuffix}</span>
+            `);
+            markers.push(m);
+          }
           const div = document.createElement('div');
           div.className = "bg-background border border-border p-3 rounded-sm hover:border-primary cursor-pointer";
           div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.indirizzo}</div><div class="flex justify-between mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-xs text-muted">${st.distanza} km</span></div><div class="text-[10px] mt-1 ${dateInfo.cardClass}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">Aggiornato: ${dateInfo.text}${relSuffix}</div>`;
-          div.onclick = () => map.flyTo([st.latitudine, st.longitudine], 16);
+          div.onclick = () => {
+            if (map) map.flyTo([st.latitudine, st.longitudine], 16);
+            else openExternalMap(st.latitudine, st.longitudine, st.gestore);
+          };
           document.getElementById('lista').appendChild(div);
         });
-        if (data.length > 0) map.fitBounds(markers.map(m => m.getLatLng()));
+        if (map && data.length > 0) map.fitBounds(markers.map(m => m.getLatLng()));
       } catch(e) {
         alert("Errore di connessione al server.");
       }
@@ -302,10 +331,12 @@
       navigator.geolocation.getCurrentPosition(pos => {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
-        map.flyTo([lat, lon], 14);
-        if (searchMarker) map.removeLayer(searchMarker);
-        searchMarker = L.marker([lat, lon]).addTo(map).bindPopup('📍 La tua posizione attuale').openPopup();
         currentLat = lat; currentLon = lon;
+        if (map) {
+          map.flyTo([lat, lon], 14);
+          if (searchMarker) map.removeLayer(searchMarker);
+          searchMarker = L.marker([lat, lon]).addTo(map).bindPopup('📍 La tua posizione attuale').openPopup();
+        }
         cerca(lat, lon);
       }, () => alert("Impossibile ottenere la posizione."));
     }
@@ -318,7 +349,7 @@
         if (data && data.length > 0) {
           const lat = parseFloat(data[0].lat);
           const lon = parseFloat(data[0].lon);
-          map.flyTo([lat, lon], 13);
+          if (map) map.flyTo([lat, lon], 13);
           setSearchCenter({ lat, lng: lon });
         } else { alert("Città non trovata"); }
       } catch(e) { alert("Errore ricerca città"); }

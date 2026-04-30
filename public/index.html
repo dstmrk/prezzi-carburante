@@ -84,8 +84,17 @@
           <input type="range" id="distance" min="1" max="25" value="5" class="w-full accent-primary">
         </div>
         <div>
-          <label class="text-xs text-muted block mb-1">Prezzi aggiornati negli ultimi (gg): <span id="maxAgeValue">7 gg</span></label>
-          <input type="range" id="maxAge" min="1" max="15" value="7" class="w-full accent-primary">
+          <label class="text-xs text-muted block mb-1 flex items-center gap-1">
+            <span>Prezzi aggiornati negli ultimi (gg): <span id="maxAgeValue">7 gg</span></span>
+            <button type="button" id="freshnessInfoBtn" aria-label="Mostra legenda colori data" aria-expanded="false" aria-controls="freshnessLegend"
+                    class="ml-auto w-5 h-5 rounded-full border border-border text-[10px] leading-none text-muted hover:text-white hover:border-primary flex items-center justify-center">ⓘ</button>
+          </label>
+          <input type="range" id="maxAge" min="1" max="15" value="7" class="w-full accent-primary" aria-describedby="freshnessLegend">
+          <div id="freshnessLegend" class="hidden mt-2 text-[11px] bg-background border border-border rounded-sm p-2 space-y-1" role="region" aria-label="Legenda colori data aggiornamento">
+            <div><span class="inline-block w-2 h-2 rounded-full bg-zinc-400 mr-1 align-middle"></span><span class="text-muted">Grigio: aggiornato negli ultimi <span id="legendWarnDays"></span> giorni</span></div>
+            <div><span class="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1 align-middle"></span><span class="text-yellow-400">Giallo: tra <span id="legendWarnDays2"></span> e <span id="legendOldDays"></span> giorni fa</span></div>
+            <div><span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-1 align-middle"></span><span class="text-red-400">Rosso: più di <span id="legendOldDays2"></span> giorni fa</span></div>
+          </div>
         </div>
         <div>
           <label class="text-xs text-muted block mb-1">Numero di risultati</label>
@@ -143,7 +152,11 @@
       return `${n} giorni fa`;
     }
 
-    const COLOR_LEGEND = 'Grigio: aggiornato negli ultimi 3 giorni\nGiallo: tra 3 e 7 giorni fa\nRosso: più di 7 giorni fa';
+    // Soglie di freschezza (in giorni)
+    const FRESHNESS_WARN_DAYS = 3;
+    const FRESHNESS_OLD_DAYS = 7;
+
+    const COLOR_LEGEND = `Grigio: aggiornato negli ultimi ${FRESHNESS_WARN_DAYS} giorni\nGiallo: tra ${FRESHNESS_WARN_DAYS} e ${FRESHNESS_OLD_DAYS} giorni fa\nRosso: più di ${FRESHNESS_OLD_DAYS} giorni fa`;
 
     // Restituisce { text, relative, tooltip, cardClass, popupColor }
     function getDateDisplay(rawDate) {
@@ -153,8 +166,8 @@
       const text = formatDateDDMMYYYY(d);
       const relative = formatRelative(days);
       const tooltip = `Aggiornato il ${text} (${relative})\n\n${COLOR_LEGEND}`;
-      if (days > 7) return { text, relative, tooltip, cardClass: 'text-red-400', popupColor: '#b91c1c' };
-      if (days > 3) return { text, relative, tooltip, cardClass: 'text-yellow-400', popupColor: '#b45309' };
+      if (days > FRESHNESS_OLD_DAYS) return { text, relative, tooltip, cardClass: 'text-red-400', popupColor: '#b91c1c' };
+      if (days > FRESHNESS_WARN_DAYS) return { text, relative, tooltip, cardClass: 'text-yellow-400', popupColor: '#b45309' };
       return { text, relative, tooltip, cardClass: 'text-muted', popupColor: '#6b7280' };
     }
 
@@ -239,9 +252,9 @@
       sorted.forEach(st => {
         const dateInfo = getDateDisplay(st.data);
         const relSuffix = dateInfo.relative ? ` · ${dateInfo.relative}` : '';
-        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.indirizzo}<br><span style="color:#10b981;font-weight:bold">Km ${st.routeDist.toFixed(1)} • ${st.prezzo.toFixed(3)} €</span><br><span style="color:${dateInfo.popupColor}" title="${dateInfo.tooltip}">Aggiornato: ${dateInfo.text}${relSuffix}</span>`);
+        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.indirizzo}<br><span style="color:#10b981;font-weight:bold">Km ${st.routeDist.toFixed(1)} • ${st.prezzo.toFixed(3)} €</span><br><span style="color:${dateInfo.popupColor}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">Aggiornato: ${dateInfo.text}${relSuffix}</span>`);
         routeMarkers.push(marker);
-        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs text-muted mb-0.5">Al km ${st.routeDist.toFixed(1)}</div><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.indirizzo}</div><div class="flex justify-between items-center mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-[10px] ${dateInfo.cardClass}" title="${dateInfo.tooltip}">${dateInfo.text}${relSuffix}</span></div></div>`;
+        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs text-muted mb-0.5">Al km ${st.routeDist.toFixed(1)}</div><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.indirizzo}</div><div class="flex justify-between items-center mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-[10px] ${dateInfo.cardClass}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">${dateInfo.text}${relSuffix}</span></div></div>`;
       });
       document.getElementById('routeResults').innerHTML = html || '<p class="text-xs text-muted">Nessun distributore trovato lungo il percorso.</p>';
     }
@@ -266,12 +279,12 @@
             <b>${st.gestore}</b><br>${st.indirizzo}<br>
             <span style="color:#10b981;font-weight:bold">${st.prezzo.toFixed(3)} €/litro</span><br>
             ${st.self ? '🟢 Self' : '🔧 Servito'} • ${st.distanza} km<br>
-            <span style="color:${dateInfo.popupColor}" title="${dateInfo.tooltip}">Aggiornato: ${dateInfo.text}${relSuffix}</span>
+            <span style="color:${dateInfo.popupColor}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">Aggiornato: ${dateInfo.text}${relSuffix}</span>
           `);
           markers.push(m);
           const div = document.createElement('div');
           div.className = "bg-background border border-border p-3 rounded-sm hover:border-primary cursor-pointer";
-          div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.indirizzo}</div><div class="flex justify-between mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-xs text-muted">${st.distanza} km</span></div><div class="text-[10px] mt-1 ${dateInfo.cardClass}" title="${dateInfo.tooltip}">Aggiornato: ${dateInfo.text}${relSuffix}</div>`;
+          div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.indirizzo}</div><div class="flex justify-between mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-xs text-muted">${st.distanza} km</span></div><div class="text-[10px] mt-1 ${dateInfo.cardClass}" title="${dateInfo.tooltip}" aria-label="${dateInfo.tooltip.replace(/\n/g, ' — ')}">Aggiornato: ${dateInfo.text}${relSuffix}</div>`;
           div.onclick = () => map.flyTo([st.latitudine, st.longitudine], 16);
           document.getElementById('lista').appendChild(div);
         });
@@ -314,6 +327,19 @@
 
     document.getElementById('maxAge').addEventListener('input', function() {
       document.getElementById('maxAgeValue').textContent = this.value + ' gg';
+    });
+
+    // Popola la legenda con le costanti centralizzate
+    document.getElementById('legendWarnDays').textContent = FRESHNESS_WARN_DAYS;
+    document.getElementById('legendWarnDays2').textContent = FRESHNESS_WARN_DAYS;
+    document.getElementById('legendOldDays').textContent = FRESHNESS_OLD_DAYS;
+    document.getElementById('legendOldDays2').textContent = FRESHNESS_OLD_DAYS;
+
+    document.getElementById('freshnessInfoBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      const legend = document.getElementById('freshnessLegend');
+      const open = legend.classList.toggle('hidden') === false;
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
     function getMaxAgeDays() {

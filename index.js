@@ -48,8 +48,8 @@ function stringToDate(dateString) {
 
 function isRecent(date) {
   if (!date) return false;
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  return date >= oneWeekAgo;
+  const cutoff = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+  return date >= cutoff;
 }
 
 function normalizeHeader(value) {

@@ -84,6 +84,10 @@
           <input type="range" id="distance" min="1" max="25" value="5" class="w-full accent-primary">
         </div>
         <div>
+          <label class="text-xs text-muted block mb-1">Prezzi aggiornati negli ultimi (gg): <span id="maxAgeValue">7 gg</span></label>
+          <input type="range" id="maxAge" min="1" max="15" value="7" class="w-full accent-primary">
+        </div>
+        <div>
           <label class="text-xs text-muted block mb-1">Numero di risultati</label>
           <input type="number" id="results" value="15" min="5" max="50" class="w-full bg-background border border-border rounded-sm p-2 text-sm outline-none">
         </div>
@@ -210,10 +214,12 @@
           .then(data => ({ data, dist: s.dist }))
           .catch(() => ({ data: [], dist: s.dist }))
       ));
+      const maxAge = getMaxAgeDays();
       const unique = new Map();
       for (const { data, dist } of responses) {
-        if (data.length === 0) continue;
-        const st = data[0];
+        const filtered = filterByMaxAge(data, maxAge);
+        if (filtered.length === 0) continue;
+        const st = filtered[0];
         const key = `${st.gestore}|${st.indirizzo}`.toLowerCase();
         if (!unique.has(key)) unique.set(key, { ...st, routeDist: dist / 1000 });
       }
@@ -238,7 +244,8 @@
       }
       markers.forEach(m => map.removeLayer(m)); markers = [];
       try {
-        const data = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
+        const raw = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
+        const data = filterByMaxAge(raw, getMaxAgeDays());
         document.getElementById('lista').innerHTML = `<h2 class="text-sm font-semibold">Risultati (${data.length})</h2>`;
         data.forEach(st => {
           const dateInfo = getDateDisplay(st.data);
@@ -291,6 +298,22 @@
     document.getElementById('distance').addEventListener('input', function() {
       document.getElementById('distanceValue').textContent = this.value + ' km';
     });
+
+    document.getElementById('maxAge').addEventListener('input', function() {
+      document.getElementById('maxAgeValue').textContent = this.value + ' gg';
+    });
+
+    function getMaxAgeDays() {
+      return parseInt(document.getElementById('maxAge').value, 10);
+    }
+
+    function filterByMaxAge(stations, maxDays) {
+      return stations.filter(st => {
+        const d = parseApiDate(st.data);
+        if (!d) return true; // se la data manca, non filtriamo
+        return ageInDays(d) <= maxDays;
+      });
+    }
 
     window.onload = initMap;
   </script>

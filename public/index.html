@@ -44,11 +44,12 @@
       <div class="mb-6 space-y-2">
         <label class="text-xs font-medium text-muted">Cerca città o indirizzo</label>
         <div class="flex gap-2">
-          <input id="citySearch" type="text" placeholder="Roma, Torino..." 
+          <input id="citySearch" type="text" placeholder="Roma, Torino..."
                  class="flex-1 bg-background border border-border rounded-sm p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
                  onkeydown="if(event.key === 'Enter') searchCity()">
           <button onclick="searchCity()" class="bg-border hover:bg-zinc-700 px-4 rounded-sm">🔎</button>
         </div>
+        <p id="searchResult" class="hidden text-xs"></p>
       </div>
 
       <!-- Sezione PERCORSO (solo desktop: richiede mappa) -->
@@ -220,6 +221,7 @@
  // --- FUNZIONI ORIGINALI INSERITE ---
     function setSearchCenter(latlng) {
       currentLat = latlng.lat; currentLon = latlng.lng;
+      clearSearchResult();
       if (!map) return;
       if (searchMarker) map.removeLayer(searchMarker);
       searchMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup('📍 Centro').openPopup();
@@ -344,6 +346,7 @@
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
         currentLat = lat; currentLon = lon;
+        clearSearchResult();
         if (map) {
           map.flyTo([lat, lon], 14);
           if (searchMarker) map.removeLayer(searchMarker);
@@ -353,23 +356,57 @@
       }, () => alert("Impossibile ottenere la posizione."));
     }
 
+    function formatNominatimAddress(item) {
+      const a = item.address || {};
+      const street = a.road || a.pedestrian || a.footway || a.path || '';
+      const civic = a.house_number || '';
+      const cap = a.postcode || '';
+      const city = a.city || a.town || a.village || a.municipality || a.county || '';
+      const streetPart = [street, civic].filter(Boolean).join(', ');
+      const cityPart = [cap, city].filter(Boolean).join(' ').trim();
+      const parts = [streetPart, cityPart].filter(Boolean);
+      return parts.length ? parts.join(' — ') : (item.display_name || '');
+    }
+
+    function showSearchResult(text, kind) {
+      const el = document.getElementById('searchResult');
+      const colorClass = kind === 'error' ? 'text-red-400'
+                       : kind === 'warn' ? 'text-yellow-400'
+                       : 'text-muted';
+      el.textContent = text;
+      el.className = `text-xs ${colorClass}`;
+    }
+
+    function clearSearchResult() {
+      const el = document.getElementById('searchResult');
+      el.textContent = '';
+      el.className = 'hidden text-xs';
+    }
+
     async function searchCity() {
       const query = document.getElementById('citySearch').value.trim();
       if (!query) return;
       try {
-        const data = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=it`)).json();
+        const data = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=it&addressdetails=1`)).json();
         if (data && data.length > 0) {
           const lat = parseFloat(data[0].lat);
           const lon = parseFloat(data[0].lon);
           if (map) map.flyTo([lat, lon], 13);
           setSearchCenter({ lat, lng: lon });
-        } else { alert("Città non trovata"); }
-      } catch(e) { alert("Errore ricerca città"); }
+          showSearchResult('📍 ' + formatNominatimAddress(data[0]), 'info');
+        } else {
+          showSearchResult('⚠️ Indirizzo non trovato. Prova a essere più specifico (via, civico, città).', 'warn');
+        }
+      } catch(e) {
+        showSearchResult('⚠️ Errore di rete durante la ricerca.', 'error');
+      }
     }
     
     document.getElementById('distance').addEventListener('input', function() {
       document.getElementById('distanceValue').textContent = this.value + ' km';
     });
+
+    document.getElementById('citySearch').addEventListener('input', clearSearchResult);
 
     document.getElementById('maxAge').addEventListener('input', function() {
       document.getElementById('maxAgeValue').textContent = this.value + ' gg';

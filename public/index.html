@@ -103,6 +103,13 @@
           <label class="text-xs text-muted block mb-1">Numero di risultati</label>
           <input type="number" id="results" value="15" min="5" max="50" class="w-full bg-background border border-border rounded-sm p-2 text-sm outline-none">
         </div>
+        <div id="iosMapPref" class="hidden">
+          <label class="text-xs text-muted block mb-1" for="iosMapApp">Apri mappe con</label>
+          <select id="iosMapApp" class="w-full bg-background border border-border rounded-sm p-2 text-sm outline-none">
+            <option value="apple">Apple Maps</option>
+            <option value="google">Google Maps</option>
+          </select>
+        </div>
 
         <button onclick="cerca()" class="w-full bg-primary text-black font-bold py-3 rounded-sm hover:bg-emerald-600 text-lg">🔎 Cerca</button>
         <button onclick="usaPosizioneAttuale()" class="w-full border border-border hover:bg-border py-2 rounded-sm text-sm">📍 Posizione attuale</button>
@@ -188,18 +195,23 @@
       });
     }
 
+    const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '');
+    const IS_ANDROID = /android/i.test(navigator.userAgent || '');
+    const MAPS_PREF_KEY = 'mapsApp'; // 'apple' | 'google'
+
     // Apre l'app/sito di mappe esterno per le coordinate fornite
     function openExternalMap(lat, lon, label) {
-      const ua = navigator.userAgent || '';
-      const isAndroid = /android/i.test(ua);
       const labelEnc = encodeURIComponent(label || '');
       let url;
-      if (isAndroid) {
+      if (IS_ANDROID) {
         // geo: rispetta l'app default scelta dall'utente (Google Maps, Waze, ecc.)
         url = `geo:${lat},${lon}?q=${lat},${lon}(${labelEnc})`;
+      } else if (IS_IOS) {
+        const pref = localStorage.getItem(MAPS_PREF_KEY) || 'apple';
+        url = pref === 'google'
+          ? `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`
+          : `https://maps.apple.com/?ll=${lat},${lon}&q=${labelEnc}`;
       } else {
-        // iOS: i universal link di Google Maps aprono l'app se installata,
-        // altrimenti la web app. Desktop: web Google Maps.
         url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
       }
       window.open(url, '_blank', 'noopener');
@@ -368,6 +380,16 @@
     document.getElementById('legendWarnDays2').textContent = FRESHNESS_WARN_DAYS;
     document.getElementById('legendOldDays').textContent = FRESHNESS_OLD_DAYS;
     document.getElementById('legendOldDays2').textContent = FRESHNESS_OLD_DAYS;
+
+    // Selettore preferenza mappe: visibile solo su iOS mobile (Android usa geo:,
+    // desktop apre Google Maps web). La preferenza e' persistente in localStorage.
+    if (IS_IOS && !isDesktopLayout()) {
+      const pref = document.getElementById('iosMapPref');
+      const select = document.getElementById('iosMapApp');
+      pref.classList.remove('hidden');
+      select.value = localStorage.getItem(MAPS_PREF_KEY) || 'apple';
+      select.addEventListener('change', () => localStorage.setItem(MAPS_PREF_KEY, select.value));
+    }
 
     document.getElementById('freshnessInfoBtn').addEventListener('click', function(e) {
       e.preventDefault();

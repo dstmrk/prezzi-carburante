@@ -109,6 +109,40 @@
     let routePoints = [], routePolyline = null, routeMarkers = [], isDrawing = false;
     const API_BASE = ''; // Lascia vuoto per Render
 
+    // Parsing della data "DD/MM/YYYY HH:MM:SS" restituita dall'API
+    function parseApiDate(raw) {
+      if (!raw || typeof raw !== 'string') return null;
+      const [datePart, timePart] = raw.split(' ');
+      if (!datePart) return null;
+      const [day, month, year] = datePart.split('/');
+      if (!day || !month || !year) return null;
+      const iso = `${year}-${month}-${day}T${timePart || '00:00:00'}`;
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    function formatDateDDMMYYYY(d) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    }
+
+    function ageInDays(d) {
+      return (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+    }
+
+    // Restituisce { text, cardClass, popupColor } da usare nei rendering
+    function getDateDisplay(rawDate) {
+      const d = parseApiDate(rawDate);
+      if (!d) return { text: 'n/d', cardClass: 'text-muted', popupColor: '#6b7280' };
+      const days = ageInDays(d);
+      const text = formatDateDDMMYYYY(d);
+      if (days > 7) return { text, cardClass: 'text-red-400', popupColor: '#b91c1c' };
+      if (days > 3) return { text, cardClass: 'text-yellow-400', popupColor: '#b45309' };
+      return { text, cardClass: 'text-muted', popupColor: '#6b7280' };
+    }
+
     function initMap() {
       map = L.map('map').setView([41.9028, 12.4964], 6);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
@@ -186,9 +220,10 @@
       const sorted = Array.from(unique.values()).sort((a,b) => a.routeDist - b.routeDist);
       let html = `<h3 class="text-xs font-semibold text-primary mb-1">Migliori lungo percorso (${sorted.length})</h3>`;
       sorted.forEach(st => {
-        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.indirizzo}<br><span style="color:#10b981;font-weight:bold">Km ${st.routeDist.toFixed(1)} • ${st.prezzo.toFixed(3)} €</span>`);
+        const dateInfo = getDateDisplay(st.data);
+        const marker = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`<b>${st.gestore}</b><br>${st.indirizzo}<br><span style="color:#10b981;font-weight:bold">Km ${st.routeDist.toFixed(1)} • ${st.prezzo.toFixed(3)} €</span><br><span style="color:${dateInfo.popupColor}">Aggiornato: ${dateInfo.text}</span>`);
         routeMarkers.push(marker);
-        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs text-muted mb-0.5">Al km ${st.routeDist.toFixed(1)}</div><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.indirizzo}</div><div class="text-sm font-bold text-primary mt-1">${st.prezzo.toFixed(3)}€</div></div>`;
+        html += `<div class="bg-background border border-border p-2 rounded-sm cursor-pointer" onclick="map.flyTo([${st.latitudine},${st.longitudine}], 15)"><div class="text-xs text-muted mb-0.5">Al km ${st.routeDist.toFixed(1)}</div><div class="text-xs font-medium">${st.gestore}</div><div class="text-[10px] text-muted">${st.indirizzo}</div><div class="flex justify-between items-center mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-[10px] ${dateInfo.cardClass}">${dateInfo.text}</span></div></div>`;
       });
       document.getElementById('routeResults').innerHTML = html || '<p class="text-xs text-muted">Nessun distributore trovato lungo il percorso.</p>';
     }
@@ -206,15 +241,17 @@
         const data = await (await fetch(`${API_BASE}/api/distributori?latitude=${lat}&longitude=${lon}&distance=${dist}&fuel=${fuel}&results=${resCount}`)).json();
         document.getElementById('lista').innerHTML = `<h2 class="text-sm font-semibold">Risultati (${data.length})</h2>`;
         data.forEach(st => {
+          const dateInfo = getDateDisplay(st.data);
           const m = L.marker([st.latitudine, st.longitudine]).addTo(map).bindPopup(`
             <b>${st.gestore}</b><br>${st.indirizzo}<br>
             <span style="color:#10b981;font-weight:bold">${st.prezzo.toFixed(3)} €/litro</span><br>
-            ${st.self ? '🟢 Self' : '🔧 Servito'} • ${st.distanza} km
+            ${st.self ? '🟢 Self' : '🔧 Servito'} • ${st.distanza} km<br>
+            <span style="color:${dateInfo.popupColor}">Aggiornato: ${dateInfo.text}</span>
           `);
           markers.push(m);
           const div = document.createElement('div');
           div.className = "bg-background border border-border p-3 rounded-sm hover:border-primary cursor-pointer";
-          div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.indirizzo}</div><div class="flex justify-between mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-xs text-muted">${st.distanza} km</span></div>`;
+          div.innerHTML = `<div class="text-sm font-medium">${st.gestore}</div><div class="text-xs text-muted">${st.indirizzo}</div><div class="flex justify-between mt-1"><span class="text-sm font-bold text-primary">${st.prezzo.toFixed(3)}€</span><span class="text-xs text-muted">${st.distanza} km</span></div><div class="text-[10px] mt-1 ${dateInfo.cardClass}">Aggiornato: ${dateInfo.text}</div>`;
           div.onclick = () => map.flyTo([st.latitudine, st.longitudine], 16);
           document.getElementById('lista').appendChild(div);
         });

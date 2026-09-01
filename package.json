@@ -28,7 +28,7 @@
     "axios": "^1.19.0",
     "compression": "^1.7.5",
     "express": "^5.2.1",
-    "papaparse": "^5.6.0",
+    "papaparse": "^5.7.0",
     "cors": "^2.8.6"
   }
 }

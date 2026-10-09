@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { FuelIcon, ListIcon, MapIcon, MapPinIcon, RouteIcon } from 'lucide-react'
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { type MouseEvent, Suspense, lazy, useEffect, useState } from 'react'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -59,6 +59,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [mobileView, setMobileView] = useState<MobileView>('lista')
+  // Cambiarla rimonta l'interfaccia: svuota i campi di ricerca e riporta la mappa sull'Italia.
+  const [resetKey, setResetKey] = useState(0)
 
   const nearbyParams =
     mode === 'vicino' && center
@@ -139,6 +141,22 @@ export default function App() {
       .catch(() => {})
   }
 
+  function resetAll(event: MouseEvent<HTMLAnchorElement>) {
+    // Con i tasti modificatori il link si apre altrove, come ogni altro link.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
+      return
+    event.preventDefault()
+    setMode('vicino')
+    setFilters(DEFAULT_FILTERS)
+    setCenter(null)
+    setRoutePoints([])
+    setSubmittedRoute(null)
+    setSelectedId(null)
+    setDrawerOpen(false)
+    setMobileView('lista')
+    setResetKey((key) => key + 1)
+  }
+
   const routeControls = {
     points: routePoints,
     dirty: !sameRoute(routePoints, submittedRoute),
@@ -159,7 +177,7 @@ export default function App() {
   const showMap = isDesktop || mobileView === 'mappa'
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
+    <div key={resetKey} className="flex h-dvh flex-col overflow-hidden md:flex-row">
       <aside
         className={cn(
           'flex min-h-0 flex-1 flex-col bg-background md:w-[380px] md:flex-none md:border-r lg:w-[420px]',
@@ -167,11 +185,18 @@ export default function App() {
         )}
       >
         <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
-          <h1 className="flex items-center gap-2 font-heading text-lg font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <FuelIcon className="size-4.5" />
-            </span>
-            Prezzi Carburante
+          <h1 className="font-heading text-lg font-semibold">
+            <a
+              href="/"
+              onClick={resetAll}
+              title="Nuova ricerca"
+              className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <FuelIcon className="size-4.5" />
+              </span>
+              Prezzi Carburante
+            </a>
           </h1>
           <ThemeToggle />
         </header>

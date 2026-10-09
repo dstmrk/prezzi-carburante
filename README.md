@@ -173,12 +173,12 @@ npm run build    # build del frontend in dist/
 npm start        # server di produzione: API + frontend da dist/
 ```
 
-| Cartella  | Contenuto                                                                                               |
-| --------- | ------------------------------------------------------------------------------------------------------- |
-| `server/` | API Express 5: parsing dei CSV, dati in memoria, ricerca geografica, HTTP                               |
-| `src/`    | Frontend React 19 + Vite, componenti [shadcn/ui](https://ui.shadcn.com) e Tailwind CSS 4, mappa Leaflet |
-| `shared/` | Tipi del contratto API e utility usate da server e frontend                                             |
-| `test/`   | Test del server (Vitest)                                                                                |
+| Cartella  | Contenuto                                                                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/` | API Express 5: parsing dei CSV, dati in memoria, ricerca geografica, HTTP                                                                                                             |
+| `src/`    | Frontend React 19 + Vite, componenti [shadcn/ui](https://ui.shadcn.com) e Tailwind CSS 4, mappa [mapcn](https://mapcn.dev) (MapLibre) con tile [OpenFreeMap](https://openfreemap.org) |
+| `shared/` | Tipi del contratto API e utility usate da server e frontend                                                                                                                           |
+| `test/`   | Test del server (Vitest)                                                                                                                                                              |
 
 Le dipendenze del frontend sono in `devDependencies`: vengono incluse nel bundle da Vite, quindi in produzione restano installate solo quelle del server.
 

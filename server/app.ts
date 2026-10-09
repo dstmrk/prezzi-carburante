@@ -36,15 +36,21 @@ export function createApp({ store, staticDir, now, logger = console }: AppOption
     helmet({
       contentSecurityPolicy: {
         directives: {
-          'img-src': ["'self'", 'data:', 'https://tile.openstreetmap.org', 'https://ko-fi.com'],
-          'connect-src': ["'self'", 'https://nominatim.openstreetmap.org'],
-          // Leaflet e Sonner applicano stili inline.
+          'img-src': ["'self'", 'data:', 'blob:', 'https://ko-fi.com'],
+          // Stili, tile, font e sprite della mappa (OpenFreeMap) e geocoding (Nominatim).
+          'connect-src': [
+            "'self'",
+            'https://tiles.openfreemap.org',
+            'https://nominatim.openstreetmap.org',
+          ],
+          'worker-src': ["'self'", 'blob:'],
+          // MapLibre e Sonner applicano stili inline.
           'style-src': ["'self'", "'unsafe-inline'"],
         },
       },
       // L'API è pubblica: deve poter essere letta da qualsiasi origine.
       crossOriginResourcePolicy: { policy: 'cross-origin' },
-      // Le policy d'uso di tile e Nominatim di OpenStreetMap richiedono il Referer.
+      // La policy d'uso di Nominatim richiede il Referer.
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     }),
   )

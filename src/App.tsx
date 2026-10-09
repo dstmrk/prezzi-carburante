@@ -26,7 +26,7 @@ import {
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-// Leaflet pesa: lo carichiamo a parte, così su mobile la lista appare subito.
+// MapLibre pesa: lo carichiamo a parte, così su mobile la lista appare subito.
 const StationMap = lazy(() => import('@/components/station-map'))
 
 type MobileView = 'lista' | 'mappa'
@@ -238,6 +238,7 @@ export default function App() {
             stations={stations}
             selected={selected}
             onSelect={selectStation}
+            onDeselect={() => setSelectedId(null)}
             center={center}
             radiusKm={filters.radiusKm}
             routePoints={routePoints}
@@ -255,7 +256,15 @@ export default function App() {
 
       {!isDesktop && (
         <>
-          <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex justify-center">
+          <div
+            className={cn(
+              'pointer-events-none fixed inset-x-0 z-40 flex justify-center',
+              // Sulla mappa sta sopra l'attribuzione di OpenStreetMap, che deve restare leggibile.
+              mobileView === 'mappa'
+                ? 'bottom-[max(2.75rem,env(safe-area-inset-bottom))]'
+                : 'bottom-[max(1rem,env(safe-area-inset-bottom))]',
+            )}
+          >
             <ToggleGroup
               variant="outline"
               spacing={0}

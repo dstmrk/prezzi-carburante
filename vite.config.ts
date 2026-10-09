@@ -15,6 +15,8 @@ export default defineConfig({
     },
   },
   build: {
+    // MapLibre da sola supera il limite di default; è caricata solo con la mappa.
+    chunkSizeWarningLimit: 1200,
     rolldownOptions: {
       output: {
         // Le librerie cambiano meno spesso del codice dell'app: chunk separati restano in cache.

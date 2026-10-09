@@ -1,6 +1,4 @@
 @import 'tailwindcss';
-/* In un cascade layer, così le utility di Tailwind hanno la precedenza sugli stili di Leaflet. */
-@import 'leaflet/dist/leaflet.css' layer(components);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
@@ -128,135 +126,22 @@
   html {
     @apply font-sans;
   }
-}
-/* --- Mappa (Leaflet) ------------------------------------------------------ */
-
-@layer components {
-  .leaflet-container {
-    font-family: var(--font-sans);
-    background: var(--muted);
+  .maplibregl-popup-content {
+    @apply rounded-none! bg-transparent! p-0! shadow-none!;
   }
-
-  /* Le tile OSM sono solo chiare: in tema scuro le invertiamo. */
-  .dark .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+  .maplibregl-popup-tip {
+    @apply hidden!;
   }
-
-  .dark .leaflet-control-zoom a,
-  .dark .leaflet-control-attribution {
-    background: var(--card);
-    color: var(--card-foreground);
-    border-color: var(--border);
+  .maplibregl-ctrl-attrib {
+    @apply rounded-md! border! border-border! bg-background! text-muted-foreground! shadow-sm!;
   }
-
-  .dark .leaflet-control-attribution a {
-    color: var(--muted-foreground);
+  .maplibregl-ctrl-attrib a {
+    @apply text-muted-foreground!;
   }
-
-  .price-pin {
-    position: relative;
-    display: flex;
-    height: 24px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    border: 1px solid var(--border);
-    background: var(--background);
-    color: var(--foreground);
-    font-size: 12px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
-    transition: transform 120ms;
+  .maplibregl-ctrl-attrib a:hover {
+    @apply text-foreground!;
   }
-
-  .price-pin::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    translate: -50% 0;
-    border: 5px solid transparent;
-    border-bottom: 0;
-    border-top-color: var(--background);
-    filter: drop-shadow(0 1px 0 var(--border));
-  }
-
-  .price-pin--cheapest {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: var(--primary-foreground);
-  }
-
-  .price-pin--cheapest::after {
-    border-top-color: var(--primary);
-  }
-
-  .price-pin--selected {
-    transform: scale(1.15);
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
-
-  .center-pin {
-    width: 20px;
-    height: 20px;
-    border-radius: 9999px;
-    border: 3px solid white;
-    background: oklch(0.6 0.2 255);
-    box-shadow:
-      0 0 0 6px oklch(0.6 0.2 255 / 0.25),
-      0 1px 3px rgb(0 0 0 / 0.3);
-  }
-
-  .search-radius {
-    stroke: var(--primary);
-    stroke-width: 1.5;
-    stroke-dasharray: 6 6;
-    fill: var(--primary);
-    fill-opacity: 0.05;
-  }
-
-  .route-line {
-    stroke: var(--primary);
-    stroke-width: 5;
-    stroke-opacity: 0.85;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    fill: none;
-  }
-
-  .route-vertex {
-    stroke: white;
-    stroke-width: 2;
-    fill: var(--primary);
-    fill-opacity: 1;
-  }
-
-  .station-popup .leaflet-popup-content-wrapper {
-    border-radius: var(--radius-xl);
-    background: var(--popover);
-    color: var(--popover-foreground);
-    box-shadow:
-      0 0 0 1px color-mix(in oklch, var(--foreground) 10%, transparent),
-      0 8px 24px rgb(0 0 0 / 0.15);
-  }
-
-  .station-popup .leaflet-popup-content {
-    margin: 20px 20px 16px 16px;
-    font-size: 14px;
-    line-height: 1.4;
-  }
-
-  .station-popup .leaflet-popup-tip {
-    background: var(--popover);
-  }
-
-  .station-popup a.leaflet-popup-close-button {
-    color: var(--muted-foreground);
-  }
-
-  .station-popup .leaflet-popup-content p {
-    margin: 0;
+  .maplibregl-ctrl-attrib-button {
+    @apply bg-transparent! dark:invert;
   }
 }

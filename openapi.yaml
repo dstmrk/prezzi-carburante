@@ -1,0 +1,257 @@
+openapi: 3.1.0
+info:
+  title: Prezzi Carburante API
+  version: 3.0.0
+  description: |
+    Distributori di carburante più economici in Italia, dagli open data del MIMIT
+    (prezzi comunicati dai gestori, aggiornati ogni mattina).
+
+    I prezzi comunicati più di 15 giorni fa e quelli palesemente errati (fuori da
+    0,6×–2× la mediana nazionale del carburante) vengono esclusi.
+  license:
+    name: MIT
+    url: https://github.com/dstmrk/prezzi-carburante/blob/main/LICENSE
+servers:
+  - url: https://prezzi-carburante.onrender.com
+# API pubblica, senza autenticazione.
+security: []
+paths:
+  /api/distributori:
+    get:
+      operationId: getDistributori
+      summary: Distributori più economici vicino a un punto
+      description: Ordinati per prezzo crescente; a parità di prezzo, per distanza.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema: { type: number, example: 45.4642 }
+        - name: longitude
+          in: query
+          required: true
+          schema: { type: number, example: 9.19 }
+        - name: distance
+          in: query
+          required: true
+          description: Raggio di ricerca in km. Valori oltre 50 vengono ridotti a 50.
+          schema: { type: number, exclusiveMinimum: 0, example: 5 }
+        - name: fuel
+          in: query
+          required: true
+          description: Tipo di carburante, senza distinzione tra maiuscole e minuscole. Vedi `/api/carburanti`.
+          schema: { type: string, example: benzina }
+        - name: results
+          in: query
+          description: Numero massimo di risultati (1–50).
+          schema: { type: integer, default: 5, minimum: 1, maximum: 50 }
+        - name: maxAge
+          in: query
+          description: Esclude i prezzi comunicati più di N giorni fa.
+          schema: { type: number, exclusiveMinimum: 0, example: 7 }
+      responses:
+        '200':
+          description: Elenco dei distributori
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Distributore' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/NotReady' }
+  /api/prezzo:
+    get:
+      operationId: getPrezzo
+      summary: Prezzo di un carburante in un impianto
+      parameters:
+        - name: stationID
+          in: query
+          required: true
+          description: Identificativo MIMIT dell'impianto (campo `id` di `/api/distributori`).
+          schema: { type: integer, example: 28617 }
+        - name: fuel
+          in: query
+          required: true
+          schema: { type: string, example: benzina }
+        - name: output
+          in: query
+          description: Con `text` restituisce solo il prezzo, con la virgola e tre decimali (es. `1,879`).
+          schema: { type: string, enum: [json, text], default: json }
+      responses:
+        '200':
+          description: Prezzo dell'impianto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrezzoImpianto' }
+            text/plain:
+              schema: { type: string, example: '1,879' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404':
+          description: Impianto inesistente o carburante non disponibile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/NotReady' }
+  /api/percorso:
+    post:
+      operationId: postPercorso
+      summary: Distributori più economici lungo un percorso
+      description: |
+        Cerca gli impianti entro `distance` km dalla polilinea indicata. Ordinati per
+        prezzo crescente; ogni risultato riporta la progressiva in km lungo il percorso.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [points, fuel]
+              properties:
+                points:
+                  type: array
+                  description: Tappe come coppie [latitudine, longitudine].
+                  minItems: 2
+                  maxItems: 1000
+                  items:
+                    type: array
+                    prefixItems:
+                      - { type: number, minimum: -90, maximum: 90 }
+                      - { type: number, minimum: -180, maximum: 180 }
+                    minItems: 2
+                    maxItems: 2
+                  example: [[45.4642, 9.19], [44.4949, 11.3426]]
+                fuel: { type: string, example: gasolio }
+                distance:
+                  type: number
+                  description: Distanza massima dal percorso in km.
+                  exclusiveMinimum: 0
+                  maximum: 10
+                  default: 2
+                results: { type: integer, minimum: 1, maximum: 50, default: 20 }
+                maxAge: { type: number, exclusiveMinimum: 0 }
+      responses:
+        '200':
+          description: Elenco dei distributori lungo il percorso
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DistributorePercorso' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/NotReady' }
+  /api/carburanti:
+    get:
+      operationId: getCarburanti
+      summary: Tipi di carburante disponibili
+      description: Valori accettati dal parametro `fuel`, ordinati per numero di impianti.
+      responses:
+        '200':
+          description: Elenco dei carburanti
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, nome, impianti]
+                  properties:
+                    id: { type: string, example: benzina }
+                    nome: { type: string, example: Benzina }
+                    impianti: { type: integer, example: 21104 }
+        '503': { $ref: '#/components/responses/NotReady' }
+  /api/stato:
+    get:
+      operationId: getStato
+      summary: Stato dei dati in memoria
+      responses:
+        '200':
+          description: Stato
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pronto, estrazione, aggiornatoIl, impianti]
+                properties:
+                  pronto: { type: boolean }
+                  estrazione:
+                    type: [string, 'null']
+                    format: date
+                    description: Data di estrazione dichiarata nei CSV MIMIT.
+                  aggiornatoIl:
+                    type: [string, 'null']
+                    format: date-time
+                    description: Ultimo download riuscito.
+                  impianti: { type: integer }
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Il server è attivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+components:
+  schemas:
+    PrezzoImpianto:
+      type: object
+      required: [gestore, indirizzo, prezzo, self, data]
+      properties:
+        gestore:
+          type: string
+          description: Bandiera dell'impianto (es. "Agip Eni"; "Pompe Bianche" se senza marchio).
+        indirizzo: { type: string }
+        prezzo: { type: number, example: 1.879 }
+        self: { type: boolean, description: Prezzo self service (true) o servito (false). }
+        data:
+          type: string
+          description: Data di comunicazione del prezzo, "DD/MM/YYYY HH:MM:SS" ora italiana.
+          example: 17/03/2026 09:02:05
+    Distributore:
+      allOf:
+        - $ref: '#/components/schemas/PrezzoImpianto'
+        - type: object
+          required: [ranking, distanza, latitudine, longitudine, id, nome]
+          properties:
+            ranking: { type: integer, minimum: 1 }
+            distanza:
+              type: string
+              description: Distanza in km dal punto di ricerca, con due decimali.
+              example: '3.53'
+            latitudine: { type: number }
+            longitudine: { type: number }
+            id: { type: integer, description: Identificativo MIMIT dell'impianto. }
+            nome: { type: string, description: Nome dell'impianto. }
+    DistributorePercorso:
+      allOf:
+        - $ref: '#/components/schemas/Distributore'
+        - type: object
+          required: [km]
+          properties:
+            distanza:
+              description: Distanza in km dal percorso, con due decimali.
+            km:
+              type: number
+              description: Progressiva in km lungo il percorso.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+  responses:
+    BadRequest:
+      description: Parametri non validi
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotReady:
+      description: Dati non ancora scaricati dal MIMIT (subito dopo l'avvio). Riprova dopo `Retry-After` secondi.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

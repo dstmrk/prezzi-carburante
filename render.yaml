@@ -1,0 +1,15 @@
+# Configurazione del servizio Render, usata solo se il servizio è gestito come
+# Blueprint. Se è configurato dal dashboard, Build e Start Command vanno impostati
+# lì con gli stessi valori (vedi README, sezione "Deploy").
+services:
+  - type: web
+    name: prezzi-carburante
+    runtime: node
+    # Verifica il piano prima di applicare il Blueprint: qui è indicato quello gratuito.
+    plan: free
+    # --include=dev serve a Vite per la build anche se NODE_ENV=production;
+    # il prune finale lascia in produzione solo le dipendenze runtime.
+    buildCommand: npm ci --include=dev && npm run build && npm prune --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
